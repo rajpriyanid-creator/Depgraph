@@ -16,6 +16,8 @@ A graph-powered dependency analysis tool built on Neo4j. DepGraph scans your pro
 - [SBOM Export](#sbom-export)
 - [Development](#development)
 - [Configuration](#configuration)
+- [Deploy to Render (Free)](#deploy-to-render-free)
+
 
 ---
 
@@ -353,6 +355,32 @@ Or set them in `.depgraph.yml`:
 neo4j:
   uri: bolt://my-neo4j-host:7687
 ```
+
+---
+
+## Deploy to Render (Free)
+
+You can host the DepGraph Web Dashboard and API on Render's free tier by connecting it to a free Neo4j database hosted on Neo4j AuraDB.
+
+### 1. Create a Free Neo4j AuraDB Database
+1. Go to the [Neo4j Aura Console](https://console.neo4j.io/) and sign up for a free account.
+2. Create a new **AuraDB Free** instance.
+3. Download the generated credentials file containing your **Connection URI** (starts with `neo4j+s://`), Username (`neo4j`), and Password.
+
+### 2. Deploy to Render
+1. Log in to [Render](https://render.com/).
+2. Click **New +** and select **Web Service**.
+3. Connect your GitHub repository: `https://github.com/rajpriyanid-creator/Depgraph.git`.
+4. Render will read the [`render.yaml`](./render.yaml) file automatically. If prompted to manually configure:
+   * **Runtime:** `Node`
+   * **Build Command:** `pnpm install && pnpm build`
+   * **Start Command:** `node packages/cli/dist/index.js serve`
+5. Under **Environment Variables**, add the following:
+   * `NEO4J_URI` — Your AuraDB connection URI (e.g., `neo4j+s://a1b2c3d4.databases.neo4j.io`)
+   * `NEO4J_USERNAME` — `neo4j`
+   * `NEO4J_PASSWORD` — Your AuraDB password
+   * `NODE_VERSION` — `20`
+6. Click **Deploy Web Service**. Render will build the workspace and start the server. You will receive a free public URL (e.g., `https://depgraph.onrender.com`).
 
 ---
 

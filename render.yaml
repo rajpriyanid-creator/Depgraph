@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: depgraph
+    env: node
+    plan: free
+    buildCommand: pnpm install && pnpm build
+    startCommand: node packages/cli/dist/index.js serve
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NEO4J_URI
+        sync: false
+        placeholder: "e.g. neo4j+s://<db-id>.databases.neo4j.io"
+      - key: NEO4J_USERNAME
+        sync: false
+        placeholder: "neo4j"
+      - key: NEO4J_PASSWORD
+        sync: false
+        placeholder: "Your AuraDB password"
