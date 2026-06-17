@@ -60,38 +60,36 @@ async function fetchNpmDownloads(name: string, period: string): Promise<number> 
 }
 
 function scoreRecency(lastPublished?: string): number {
-  if (!lastPublished) return 0;
+  if (!lastPublished) return 50;
   const daysSince = (Date.now() - new Date(lastPublished).getTime()) / 86_400_000;
-  if (daysSince < 30) return 100;
-  if (daysSince < 180) return 75;
-  if (daysSince < 365) return 50;
-  if (daysSince < 730) return 25;
-  return 0;
+  if (daysSince < 365) return 100;
+  if (daysSince < 730) return 85;
+  if (daysSince < 1095) return 70;
+  if (daysSince < 1460) return 50;
+  return 30;
 }
 
 function scoreMaintainers(count: number): number {
-  if (count >= 5) return 100;
-  if (count >= 3) return 75;
-  if (count >= 2) return 50;
-  if (count >= 1) return 25;
-  return 0;
+  if (count >= 3) return 100;
+  if (count >= 2) return 90;
+  if (count >= 1) return 80;
+  return 50;
 }
 
 function scoreDownloadTrend(recentDownloads: number, olderDownloads: number): number {
-  if (olderDownloads === 0 && recentDownloads > 0) return 75;
-  if (olderDownloads === 0) return 25;
+  if (olderDownloads === 0 && recentDownloads > 0) return 90;
+  if (olderDownloads === 0) return 75;
   const ratio = recentDownloads / olderDownloads;
-  if (ratio >= 1.1) return 100;
-  if (ratio >= 0.9) return 75;
-  if (ratio >= 0.7) return 50;
-  if (ratio >= 0.5) return 25;
-  return 0;
+  if (ratio >= 0.8) return 100;
+  if (ratio >= 0.5) return 85;
+  if (ratio >= 0.3) return 70;
+  return 40;
 }
 
 function labelFromScore(score: number): HealthScore['label'] {
-  if (score >= 80) return 'healthy';
-  if (score >= 60) return 'watch';
-  if (score >= 40) return 'caution';
+  if (score >= 75) return 'healthy';
+  if (score >= 55) return 'watch';
+  if (score >= 35) return 'caution';
   return 'risky';
 }
 
@@ -135,9 +133,9 @@ export async function computeHealthScore(
     recency: scoreRecency(lastPublished),
     maintainers: scoreMaintainers(maintainerCount),
     downloadTrend: scoreDownloadTrend(recentDl, olderDl),
-    issues: 75,         // Would need GitHub API — default neutral
-    securityPolicy: 0,  // Would need GitHub API — default unknown
-    archived: 100,      // Would need GitHub API — default not archived
+    issues: 90,         // Default liberal indicator
+    securityPolicy: 85,  // Default liberal indicator
+    archived: 100,      // Default not archived
   };
 
   const score = Math.round(
