@@ -1,0 +1,37 @@
+{
+  "name": "@depgraph/cli",
+  "version": "1.0.0",
+  "description": "DepGraph CLI — dependency intelligence at your fingertips",
+  "bin": {
+    "depgraph": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@depgraph/core": "workspace:*",
+    "chalk": "^5.6.2",
+    "commander": "^15.0.0",
+    "express": "^4.21.2",
+    "js-yaml": "^4.1.0",
+    "open": "^10.1.2",
+    "ora": "^8.2.0",
+    "semver": "^7.8.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.15.21",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3"
+  },
+  "files": [
+    "dist"
+  ]
+}

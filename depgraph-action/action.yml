@@ -1,0 +1,101 @@
+name: 'DepGraph Dependency Analysis'
+description: 'Scan, audit, and enforce dependency policy using DepGraph'
+author: 'DepGraph'
+
+branding:
+  icon: 'search'
+  color: 'blue'
+
+inputs:
+  neo4j-uri:
+    description: 'Neo4j Bolt URI'
+    required: false
+    default: 'bolt://localhost:7687'
+  neo4j-username:
+    description: 'Neo4j username'
+    required: false
+    default: 'neo4j'
+  neo4j-password:
+    description: 'Neo4j password'
+    required: true
+  project-path:
+    description: 'Path to the project to scan'
+    required: false
+    default: '.'
+  ecosystem:
+    description: 'Ecosystem override: npm|python|rust|java'
+    required: false
+    default: ''
+  fail-on-severity:
+    description: 'Fail the action if vulnerabilities of this severity or higher are found'
+    required: false
+    default: 'critical'
+  export-sbom:
+    description: 'Whether to export a CycloneDX SBOM artifact'
+    required: false
+    default: 'true'
+
+outputs:
+  vulnerability-count:
+    description: 'Total number of vulnerabilities found'
+  critical-count:
+    description: 'Number of critical vulnerabilities'
+  scan-id:
+    description: 'Unique scan identifier'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install DepGraph CLI
+      shell: bash
+      run: npm install -g @depgraph/cli@latest
+
+    - name: Run DepGraph scan
+      shell: bash
+      run: |
+        depgraph scan ${{ inputs.project-path }} \
+          ${{ inputs.ecosystem != '' && format('--ecosystem {0}', inputs.ecosystem) || '' }}
+      env:
+        NEO4J_URI: ${{ inputs.neo4j-uri }}
+        NEO4J_USERNAME: ${{ inputs.neo4j-username }}
+        NEO4J_PASSWORD: ${{ inputs.neo4j-password }}
+
+    - name: Audit vulnerabilities
+      shell: bash
+      run: |
+        depgraph audit ${{ inputs.project-path }} --format json > /tmp/audit-results.json
+        CRITICAL=$(cat /tmp/audit-results.json | jq '[.[] | select(.severity=="critical")] | length')
+        TOTAL=$(cat /tmp/audit-results.json | jq 'length')
+        echo "vulnerability-count=$TOTAL" >> $GITHUB_OUTPUT
+        echo "critical-count=$CRITICAL" >> $GITHUB_OUTPUT
+        depgraph audit ${{ inputs.project-path }}
+      env:
+        NEO4J_URI: ${{ inputs.neo4j-uri }}
+        NEO4J_USERNAME: ${{ inputs.neo4j-username }}
+        NEO4J_PASSWORD: ${{ inputs.neo4j-password }}
+
+    - name: Evaluate policy
+      shell: bash
+      run: depgraph policy ${{ inputs.project-path }}
+      env:
+        NEO4J_URI: ${{ inputs.neo4j-uri }}
+        NEO4J_USERNAME: ${{ inputs.neo4j-username }}
+        NEO4J_PASSWORD: ${{ inputs.neo4j-password }}
+
+    - name: Export SBOM
+      if: inputs.export-sbom == 'true'
+      shell: bash
+      run: |
+        depgraph export cyclonedx --output sbom.cdx.json
+        echo "SBOM exported to sbom.cdx.json"
+      env:
+        NEO4J_URI: ${{ inputs.neo4j-uri }}
+        NEO4J_USERNAME: ${{ inputs.neo4j-username }}
+        NEO4J_PASSWORD: ${{ inputs.neo4j-password }}
+
+    - name: Upload SBOM artifact
+      if: inputs.export-sbom == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom-cyclonedx
+        path: sbom.cdx.json

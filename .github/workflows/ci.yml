@@ -1,0 +1,196 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9.15.5'
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Build & Test
+  # ──────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test (unit, no Neo4j)
+        run: pnpm test
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: |
+            packages/*/dist
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # Integration tests (with Neo4j)
+  # ──────────────────────────────────────────────
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    services:
+      neo4j:
+        image: neo4j:5-community
+        ports:
+          - 7474:7474
+          - 7687:7687
+        env:
+          NEO4J_AUTH: neo4j/depgraph
+          NEO4J_dbms_memory_heap_initial__size: 512m
+          NEO4J_dbms_memory_heap_max__size: 1G
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 10
+          --health-start-period 30s
+
+    env:
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: depgraph
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build core package
+        run: pnpm --filter @depgraph/core build
+
+      - name: Wait for Neo4j
+        run: |
+          echo "Waiting for Neo4j to be ready…"
+          for i in {1..30}; do
+            if curl -sf http://localhost:7474 > /dev/null 2>&1; then
+              echo "Neo4j is ready"
+              break
+            fi
+            sleep 3
+          done
+
+      - name: Run integration tests
+        run: pnpm --filter @depgraph/core vitest run --include 'src/**/__tests__/integration/**'
+
+  # ──────────────────────────────────────────────
+  # DepGraph self-scan on PRs
+  # ──────────────────────────────────────────────
+  depgraph-scan:
+    name: DepGraph Self-Scan
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'pull_request'
+
+    services:
+      neo4j:
+        image: neo4j:5-community
+        ports:
+          - 7474:7474
+          - 7687:7687
+        env:
+          NEO4J_AUTH: neo4j/depgraph
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 10
+          --health-start-period 30s
+
+    env:
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: depgraph
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install & Build CLI
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Wait for Neo4j
+        run: |
+          for i in {1..30}; do
+            curl -sf http://localhost:7474 > /dev/null 2>&1 && break || sleep 3
+          done
+
+      - name: Scan current project
+        run: node packages/cli/dist/index.js scan . --ecosystem npm
+
+      - name: Run dependency diff vs main
+        run: node packages/cli/dist/index.js diff main --path . || true
+
+      - name: Evaluate policy
+        run: node packages/cli/dist/index.js policy . || true
+
+      - name: Export SBOM
+        run: node packages/cli/dist/index.js export cyclonedx --output sbom.cdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json

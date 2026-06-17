@@ -1,0 +1,28 @@
+security:
+  block_on_severity: critical
+  warn_on_severity: high
+  max_vulnerability_age_days: 30
+
+licenses:
+  allowed:
+    - MIT
+    - Apache-2.0
+    - ISC
+    - BSD-2-Clause
+    - BSD-3-Clause
+    - Unlicense
+    - CC0-1.0
+    - 0BSD
+  blocked:
+    - GPL-2.0
+    - GPL-3.0
+    - AGPL-3.0
+    - SSPL-1.0
+
+health:
+  min_health_score: 30
+  block_abandoned_days: 365
+
+supply_chain:
+  typosquatting_check: true
+  ownership_change_alert: true

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+.env
+.env.local
+.depgraph/
+temp-scans/
+

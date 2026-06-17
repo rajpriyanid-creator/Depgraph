@@ -1,0 +1,30 @@
+{
+  "name": "@depgraph/ui",
+  "version": "1.0.0",
+  "description": "DepGraph local web UI — interactive dependency graph explorer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-force-graph-2d": "^1.29.1",
+    "react-force-graph-3d": "^1.29.1",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.4",
+    "@types/react-dom": "^19.1.2",
+    "@types/three": "^0.184.1",
+    "@vitejs/plugin-react": "^4.5.1",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.0"
+  }
+}

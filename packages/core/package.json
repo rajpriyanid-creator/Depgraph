@@ -1,0 +1,45 @@
+{
+  "name": "@depgraph/core",
+  "version": "1.0.0",
+  "description": "Core engine — collection, normalization, enrichment, graph analysis",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "neo4j-driver": "^6.0.0",
+    "node-fetch": "^3.3.2",
+    "semver": "^7.8.3",
+    "fast-xml-parser": "^5.2.3",
+    "glob": "^11.0.2",
+    "p-limit": "^6.2.0",
+    "p-retry": "^6.2.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.15.21",
+    "@types/semver": "^7.7.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.1"
+  },
+  "files": [
+    "dist"
+  ]
+}
