@@ -382,6 +382,19 @@ You can host the DepGraph Web Dashboard and API on Render's free tier by connect
    * `NODE_VERSION` — `20`
 6. Click **Deploy Web Service**. Render will build the workspace and start the server. You will receive a free public URL (e.g., `https://depgraph.onrender.com`).
 
+### 3. Keep Render Awake (Prevent Inactivity Sleep)
+Render's free tier automatically suspends (spins down) web services after 15 minutes of inactivity. When a new request arrives, it takes about 50–100 seconds to spin back up. 
+
+To keep your service active and avoid spin-down:
+* **Option A: GitHub Actions (Recommended & Built-in)**
+  1. Open the file [`.github/workflows/keep-awake.yml`](./.github/workflows/keep-awake.yml) in this repository.
+  2. Change the placeholder URL (`https://depgraph.onrender.com/api/projects`) to your actual Render URL.
+  3. Commit and push the changes. The workflow will run automatically every 10 minutes on GitHub's servers to keep your app awake.
+* **Option B: Free External Pingers**
+  1. Register for a free account at [Cron-Job.org](https://cron-job.org/) or [UptimeRobot](https://uptimerobot.com/).
+  2. Create a new HTTP monitor pointing to your Render app URL.
+  3. Set the check interval to **10 minutes**.
+
 ---
 
 ## Supported Ecosystems

@@ -1,0 +1,17 @@
+name: Keep Awake Render
+
+on:
+  schedule:
+    # Run every 10 minutes (Render free tier spins down after 15 mins of inactivity)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render App
+        run: |
+          # Replace the URL below with your actual deployed Render URL
+          curl -s https://depgraph.onrender.com/api/projects > /dev/null
+          echo "Pinged Render service successfully at $(date)"
