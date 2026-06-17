@@ -1,9 +1,5 @@
 # ⚡ DepGraph — Dependency Intelligence Platform
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-blue?style=for-the-badge&logo=render&color=1f6feb)](https://depgraph-ad8z.onrender.com)
-[![CI Build](https://img.shields.io/badge/CI-Passing-brightgreen?style=for-the-badge&logo=github-actions)](https://github.com/rajpriyanid-creator/Depgraph/actions)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](https://github.com/rajpriyanid-creator/Depgraph/blob/main/LICENSE)
-
 A graph-powered dependency analysis and security validation platform. DepGraph scans your project's manifests, resolves transitive relationships into a rich Neo4j knowledge graph, and surfaces real-time insights: security vulnerabilities, license compliance risks, unused "zombie" packages, duplicates, and package health scores.
 
 👉 **Explore the Live Dashboard:** [https://depgraph-ad8z.onrender.com](https://depgraph-ad8z.onrender.com)
