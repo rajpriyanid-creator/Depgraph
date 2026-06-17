@@ -62,7 +62,7 @@ Project files  →  Reader  →  Normalizer  →  Neo4j  →  Enrichment  →  A
 
 ---
 
-## Quick Start (For Judges)
+## Quick Start 
 
 Get DepGraph up and running on your system in under 2 minutes:
 
