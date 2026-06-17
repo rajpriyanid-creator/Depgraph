@@ -102,7 +102,7 @@ export function DependencyGraph({ projectName, onNodeClick }: DependencyGraphPro
     obs.observe(el);
     setDims({ w: el.clientWidth, h: el.clientHeight });
     return () => obs.disconnect();
-  }, []);
+  }, [loading, error, graphData]);
 
   useEffect(() => {
     setLoading(true); setError(null);
