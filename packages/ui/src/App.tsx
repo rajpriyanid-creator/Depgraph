@@ -25,7 +25,9 @@ export default function App() {
   const [loadingProjects,setLoadingProjects]= useState(true);
   const [repoUrl,        setRepoUrl]        = useState<string>('');
   const [localPath,      setLocalPath]      = useState<string>('');
-  const [scanning,       setScanning]       = useState(false);
+  const [scanningRepo,   setScanningRepo]   = useState(false);
+  const [scanningLocal,  setScanningLocal]  = useState(false);
+  const scanning = scanningRepo || scanningLocal;
   const [scanError,      setScanError]      = useState<string | null>(null);
   const [scanSuccess,    setScanSuccess]    = useState<string | null>(null);
   const [sidebarOpen,    setSidebarOpen]    = useState(true);
@@ -58,7 +60,7 @@ export default function App() {
 
   const handleScanRepo = async () => {
     if (!repoUrl.trim()) return;
-    setScanning(true);
+    setScanningRepo(true);
     setScanError(null);
     setScanSuccess(null);
     try {
@@ -77,14 +79,14 @@ export default function App() {
     } catch (err: any) {
       setScanError(err.message ?? String(err));
     } finally {
-      setScanning(false);
+      setScanningRepo(false);
     }
   };
 
   const handleScanLocal = async () => {
     const pathToScan = localPath.trim() || workspacePath;
     if (!pathToScan) return;
-    setScanning(true);
+    setScanningLocal(true);
     setScanError(null);
     setScanSuccess(null);
     try {
@@ -112,7 +114,7 @@ export default function App() {
     } catch (err: any) {
       setScanError(err.message ?? String(err));
     } finally {
-      setScanning(false);
+      setScanningLocal(false);
     }
   };
 
@@ -221,7 +223,7 @@ export default function App() {
                 transition: 'all 0.2s',
               }}
             >
-              {scanning ? '⏳ Scanning…' : '🔍 Analyze'}
+              {scanningRepo ? '⏳ Scanning…' : '🔍 Analyze'}
             </button>
             {scanSuccess && (
               <div style={{ marginTop: '0.4rem', fontSize: '0.72rem', color: '#2ea043', lineHeight: 1.4 }}>
@@ -269,7 +271,7 @@ export default function App() {
                 transition: 'all 0.2s',
               }}
             >
-              {scanning ? '⏳ Scanning…' : (localPath.trim() ? '📁 Analyze Local' : '📁 Analyze Workspace')}
+              {scanningLocal ? '⏳ Scanning…' : (localPath.trim() ? '📁 Analyze Local' : '📁 Analyze Workspace')}
             </button>
           </div>
         )}
