@@ -1,11 +1,54 @@
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import express from 'express';
 import chalk from 'chalk';
 import semver from 'semver';
+
+/**
+ * Search for a valid package.json starting at rootDir.
+ * First checks rootDir itself, then common subdirectory names,
+ * then any immediate child directory containing a package.json.
+ * Returns the directory containing package.json, or null.
+ */
+function findPackageJsonDir(rootDir: string): string | null {
+  const rootPkg = join(rootDir, 'package.json');
+  if (existsSync(rootPkg)) {
+    try { JSON.parse(readFileSync(rootPkg, 'utf-8')); return rootDir; } catch {}
+  }
+
+  // Common subdirectory names to try first (in priority order)
+  const PRIORITY_DIRS = [
+    'backend', 'frontend', 'client', 'server', 'app', 'src',
+    'web', 'api', 'packages', 'services', 'portal', 'ui', 'admin',
+  ];
+
+  for (const sub of PRIORITY_DIRS) {
+    const subPkg = join(rootDir, sub, 'package.json');
+    if (existsSync(subPkg)) {
+      try { JSON.parse(readFileSync(subPkg, 'utf-8')); return join(rootDir, sub); } catch {}
+    }
+  }
+
+  // Fallback: scan all immediate child directories
+  try {
+    for (const entry of readdirSync(rootDir)) {
+      const full = join(rootDir, entry);
+      try {
+        if (!statSync(full).isDirectory()) continue;
+      } catch { continue; }
+      if (entry.startsWith('.') || entry === 'node_modules') continue;
+      const pkg = join(full, 'package.json');
+      if (existsSync(pkg)) {
+        try { JSON.parse(readFileSync(pkg, 'utf-8')); return full; } catch {}
+      }
+    }
+  } catch {}
+
+  return null;
+}
 
 function parsePkgNameAndVersion(str: string): { name: string; version: string } {
   const parts = str.split('@');
@@ -85,21 +128,21 @@ export async function runServe(options: ServeOptions): Promise<void> {
       const execAsync = promisify(exec);
       await execAsync(`git clone --depth 1 "${repoUrl}" "${tempPath}"`);
 
-      // Detect ecosystem
-      const ecosystem = existsSync(join(tempPath, 'package.json')) ? 'npm' : null;
-      if (ecosystem !== 'npm') {
+      // Detect ecosystem — search root and subdirectories
+      const pkgDir = findPackageJsonDir(tempPath);
+      if (!pkgDir) {
         try {
           rmSync(tempPath, { recursive: true, force: true });
         } catch {}
         return res.status(400).json({
-          error: 'Only Node.js/NPM projects with a package.json are currently supported.',
+          error: 'No package.json found in this repository (checked root and common subdirectories like backend/, frontend/, client/, server/, etc.).',
         });
       }
 
       // Ingest
       await initSchema();
       const reader = new NpmReader();
-      const raw = await reader.read(tempPath);
+      const raw = await reader.read(pkgDir);
       raw.projectName = repoName; // Overwrite with repo name
 
       const graph = normalizeNpm(raw);
@@ -154,21 +197,10 @@ export async function runServe(options: ServeOptions): Promise<void> {
         return res.status(400).json({ error: `Directory path does not exist: ${targetPath}` });
       }
 
-      const pkgJsonPath = join(targetPath, 'package.json');
-      const exists = existsSync(pkgJsonPath);
-      let isValid = false;
-      let parseError = '';
+      // Search root and subdirectories for package.json
+      const pkgDir = findPackageJsonDir(targetPath);
 
-      if (exists) {
-        try {
-          JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
-          isValid = true;
-        } catch (e: any) {
-          parseError = e.message;
-        }
-      }
-
-      if (!exists || !isValid) {
+      if (!pkgDir) {
         // Use ImportScanner to discover imported npm packages
         const imports = await scanImports(targetPath);
         const depNames = Object.keys(imports);
@@ -194,19 +226,20 @@ export async function runServe(options: ServeOptions): Promise<void> {
 
         return res.json({
           success: false,
-          reason: !exists ? 'missing_package_json' : 'invalid_package_json',
-          errorDetails: parseError || 'package.json file is missing.',
+          reason: 'missing_package_json',
+          errorDetails: 'package.json file is missing.',
           suggestedPackageJson: JSON.stringify(suggestedPkg, null, 2),
           targetPath
         });
       }
 
-      const projectName = targetPath.split(/[\\/]/).pop() || 'local-project';
+      // Use the folder where package.json was found (may be a subdirectory)
+      const projectName = pkgDir.split(/[\\/]/).pop() || 'local-project';
 
       // Ingest
       await initSchema();
       const reader = new NpmReader();
-      const raw = await reader.read(targetPath);
+      const raw = await reader.read(pkgDir);
       raw.projectName = projectName; // Overwrite with project folder name
 
       const graph = normalizeNpm(raw);
