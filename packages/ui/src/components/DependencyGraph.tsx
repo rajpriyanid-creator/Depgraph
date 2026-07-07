@@ -43,31 +43,21 @@ function nodeSize(node: GraphNode): number {
 }
 
 export function DependencyGraph({ projectName, onNodeClick }: DependencyGraphProps) {
-  const containerRef  = useRef<HTMLDivElement>(null);
-  const fgRef         = useRef<any>(null);
-  const pinnedRef     = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fgRef        = useRef<any>(null);
+  const pinnedRef    = useRef(false);
 
   const [graphData,   setGraphData]   = useState<GraphData>({ nodes: [], links: [] });
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [mousePos,    setMousePos]    = useState({ x: 0, y: 0 });
-  const [dims,        setDims]        = useState({ w: 0, h: 0 });
+  const [containerW,  setContainerW]  = useState(800);
+  const [containerH,  setContainerH]  = useState(600);
   const [filter,      setFilter]      = useState({ showDev: true, showVulnOnly: false, search: '' });
   const [viewMode,    setViewMode]    = useState<'2d' | '3d'>('3d');
 
-  // ── Measure container ──────────────────────────────────────────────────────
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => setDims({ w: el.offsetWidth, h: el.offsetHeight });
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []); // run once on mount only
-
-  // ── Fetch graph ────────────────────────────────────────────────────────────
+  // ── Fetch graph data ───────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true); setError(null); pinnedRef.current = false;
     fetch(`/api/graph/${encodeURIComponent(projectName)}`)
@@ -77,44 +67,68 @@ export function DependencyGraph({ projectName, onNodeClick }: DependencyGraphPro
       .finally(() => setLoading(false));
   }, [projectName]);
 
-  // ── Configure forces (no auto-rotation) ───────────────────────────────────
+  // ── Measure container (fires after layout) ─────────────────────────────────
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if (w > 0 && h > 0) { setContainerW(w); setContainerH(h); }
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    // Also measure after a tick in case layout isn't done
+    const t = setTimeout(measure, 100);
+    return () => { ro.disconnect(); clearTimeout(t); };
+  }, []);
+
+  // ── Configure forces once graph loaded ─────────────────────────────────────
   useEffect(() => {
     const fg = fgRef.current;
-    if (!fg) return;
+    if (!fg || graphData.nodes.length === 0) return;
     pinnedRef.current = false;
 
     const t = setTimeout(() => {
       if (viewMode === '3d') {
         const ctrl = fg.controls?.();
         if (ctrl) {
-          ctrl.autoRotate      = false;   // ← NO auto-rotation
+          ctrl.autoRotate      = false;   // NO auto-rotation ever
           ctrl.autoRotateSpeed = 0;
           ctrl.enableDamping   = true;
-          ctrl.dampingFactor   = 0.12;
+          ctrl.dampingFactor   = 0.1;
           ctrl.rotateSpeed     = 1.2;
-          ctrl.zoomSpeed       = 3.5;
-          ctrl.panSpeed        = 1.2;
+          ctrl.zoomSpeed       = 3.0;
+          ctrl.panSpeed        = 1.0;
         }
-        fg.d3Force?.('charge')?.strength(-200);
-        fg.d3Force?.('link')?.distance(60);
-        fg.d3VelocityDecay?.(0.65);
-        fg.d3ReheatSimulation?.();
-      } else {
-        fg.d3Force?.('charge')?.strength(-180);
-        fg.d3Force?.('link')?.distance(50);
-        fg.d3ReheatSimulation?.();
       }
-    }, 80);
+      // Force settings — spread nodes out nicely
+      if (fg.d3Force) {
+        fg.d3Force('charge')?.strength(viewMode === '3d' ? -220 : -180);
+        fg.d3Force('link')?.distance(viewMode === '3d' ? 65 : 50);
+        fg.d3VelocityDecay(0.5);
+        fg.d3ReheatSimulation();
+      }
+    }, 100);
     return () => clearTimeout(t);
   }, [graphData, viewMode]);
 
-  // ── Pin nodes once simulation settles → STOPS all movement ───────────────
+  // ── After simulation settles, pin all nodes to stop movement ──────────────
   const handleEngineStop = useCallback(() => {
     if (pinnedRef.current) return;
-    pinnedRef.current = true;
     const fg = fgRef.current;
     if (!fg) return;
+
     const nodes: GraphNode[] = fg.graphData?.()?.nodes ?? [];
+
+    // Only pin if nodes have actually spread out (not all at 0,0)
+    const spread = nodes.some(n => Math.abs(n.x ?? 0) > 5 || Math.abs(n.y ?? 0) > 5);
+    if (!spread) return; // simulation hasn't run yet, don't pin
+
+    pinnedRef.current = true;
     for (const n of nodes) {
       n.fx = n.x ?? 0;
       n.fy = n.y ?? 0;
@@ -139,7 +153,7 @@ export function DependencyGraph({ projectName, onNodeClick }: DependencyGraphPro
     return { nodes, links };
   }, [graphData, filter]);
 
-  // ── When switching view, unpin so simulation re-runs in new mode ──────────
+  // ── Switch view mode (unpin so layout re-runs in new mode) ────────────────
   const switchView = (mode: '2d' | '3d') => {
     const nodes: GraphNode[] = fgRef.current?.graphData?.()?.nodes ?? [];
     for (const n of nodes) { delete n.fx; delete n.fy; delete n.fz; }
@@ -166,9 +180,6 @@ export function DependencyGraph({ projectName, onNodeClick }: DependencyGraphPro
 
   const data = filteredData();
 
-  // Only render graph when we have measured container size
-  const ready = dims.w > 0 && dims.h > 0;
-
   return (
     <div
       ref={containerRef}
@@ -178,73 +189,64 @@ export function DependencyGraph({ projectName, onNodeClick }: DependencyGraphPro
         if (rect) setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
       }}
     >
-      {/* ── Controls bar ── */}
+      {/* ── Controls ── */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
-        background: 'linear-gradient(180deg, rgba(4,7,13,0.95) 0%, rgba(4,7,13,0.5) 80%, transparent 100%)',
-        padding: '10px 14px 22px',
-        display: 'flex', gap: '0.55rem', flexWrap: 'wrap', alignItems: 'center',
+        background: 'linear-gradient(180deg,rgba(4,7,13,0.95) 0%,rgba(4,7,13,0.5) 78%,transparent 100%)',
+        padding: '10px 14px 24px',
+        display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center',
       }}>
-        <input
-          type="text"
-          placeholder="🔍 Search packages…"
-          value={filter.search}
+        <input type="text" placeholder="🔍 Search packages…" value={filter.search}
           onChange={e => setFilter(f => ({ ...f, search: e.target.value }))}
           style={{
-            background: 'rgba(12,18,32,0.9)', border: '1px solid var(--border)',
+            background: 'rgba(12,18,32,0.92)', border: '1px solid var(--border)',
             color: 'var(--text-primary)', borderRadius: 8, padding: '5px 11px',
-            fontSize: '0.82rem', width: 190, outline: 'none',
+            fontSize: '0.82rem', width: 185, outline: 'none',
             backdropFilter: 'blur(8px)', fontFamily: 'var(--font-sans)',
           }}
         />
 
-        {/* 2D / 3D Toggle */}
-        <div style={{ display: 'flex', background: 'rgba(12,18,32,0.9)',
-          border: '1px solid var(--border)', borderRadius: 8, padding: 2, backdropFilter: 'blur(8px)' }}>
+        <div style={{ display: 'flex', background: 'rgba(12,18,32,0.92)',
+          border: '1px solid var(--border)', borderRadius: 8, padding: 2 }}>
           {(['2d', '3d'] as const).map(m => (
-            <button key={m} onClick={() => switchView(m)}
-              style={{
-                background: viewMode === m ? 'var(--accent-blue)' : 'transparent',
-                color: viewMode === m ? '#fff' : 'var(--text-muted)',
-                border: 'none', borderRadius: 6, padding: '4px 12px',
-                fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-              }}>
-              {m.toUpperCase()} Graph
-            </button>
+            <button key={m} onClick={() => switchView(m)} style={{
+              background: viewMode === m ? 'var(--accent-blue)' : 'transparent',
+              color: viewMode === m ? '#fff' : 'var(--text-muted)',
+              border: 'none', borderRadius: 6, padding: '4px 12px',
+              fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+            }}>{m.toUpperCase()} Graph</button>
           ))}
         </div>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.78rem',
-          color: 'var(--text-muted)', cursor: 'pointer', background: 'rgba(12,18,32,0.9)',
-          border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', backdropFilter: 'blur(4px)' }}>
+          color: 'var(--text-muted)', cursor: 'pointer', background: 'rgba(12,18,32,0.92)',
+          border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px' }}>
           <input type="checkbox" checked={filter.showDev}
             onChange={e => setFilter(f => ({ ...f, showDev: e.target.checked }))} />
           Dev
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.78rem',
-          color: 'var(--text-muted)', cursor: 'pointer', background: 'rgba(12,18,32,0.9)',
-          border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', backdropFilter: 'blur(4px)' }}>
+          color: 'var(--text-muted)', cursor: 'pointer', background: 'rgba(12,18,32,0.92)',
+          border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px' }}>
           <input type="checkbox" checked={filter.showVulnOnly}
             onChange={e => setFilter(f => ({ ...f, showVulnOnly: e.target.checked }))} />
           Vulns only
         </label>
 
-        <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)', background: 'rgba(12,18,32,0.9)',
-          border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px' }}>
+        <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)',
+          background: 'rgba(12,18,32,0.92)', border: '1px solid var(--border)',
+          borderRadius: 6, padding: '4px 9px' }}>
           {data.nodes.length} nodes · {data.links.length} edges
         </span>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          {[
-            { color: '#a78bfa', label: 'Root' },
-            { color: '#4f8ef7', label: 'Direct' },
-            { color: '#556070', label: 'Transitive' },
-            { color: '#f87171', label: 'Vulnerable' },
-          ].map(({ color, label }) => (
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          {[{ color: '#a78bfa', label: 'Root' }, { color: '#4f8ef7', label: 'Direct' },
+            { color: '#556070', label: 'Transitive' }, { color: '#f87171', label: 'Vulnerable' }]
+            .map(({ color, label }) => (
             <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4,
               fontSize: '0.69rem', color: 'var(--text-muted)' }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: color,
-                display: 'inline-block', boxShadow: `0 0 4px ${color}88` }} />
+                display: 'inline-block', boxShadow: `0 0 5px ${color}88` }} />
               {label}
             </span>
           ))}
@@ -255,11 +257,11 @@ export function DependencyGraph({ projectName, onNodeClick }: DependencyGraphPro
       {hoveredNode && (
         <div style={{
           position: 'absolute',
-          left: Math.min(mousePos.x + 16, (dims.w || 800) - 260),
-          top:  Math.min(mousePos.y + 16, (dims.h || 600) - 130),
+          left: Math.min(mousePos.x + 16, containerW - 260),
+          top:  Math.min(mousePos.y + 16, containerH - 130),
           zIndex: 20, pointerEvents: 'none',
           background: 'rgba(8,13,22,0.97)', border: '1px solid var(--border-bright)',
-          borderRadius: 10, padding: '0.7rem 1rem', minWidth: 195, maxWidth: 245,
+          borderRadius: 10, padding: '0.7rem 1rem', minWidth: 190, maxWidth: 240,
           backdropFilter: 'blur(14px)', boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
         }}>
           <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.875rem', marginBottom: 3 }}>
@@ -285,8 +287,8 @@ export function DependencyGraph({ projectName, onNodeClick }: DependencyGraphPro
         </div>
       )}
 
-      {/* ── Graph canvas — only render when container is measured ── */}
-      {ready && viewMode === '2d' && (
+      {/* ── 2D Graph ── */}
+      {viewMode === '2d' && (
         <ForceGraph2D
           ref={fgRef}
           graphData={data}
@@ -294,23 +296,19 @@ export function DependencyGraph({ projectName, onNodeClick }: DependencyGraphPro
           nodeLabel=""
           nodeColor={nodeColor}
           nodeVal={nodeSize}
-          width={dims.w}
-          height={dims.h}
-          // Stop simulation quickly: 120 warm-up ticks then freeze
-          cooldownTicks={120}
-          cooldownTime={3000}
+          width={containerW}
+          height={containerH}
+          // Let simulation run freely until natural stop, then pin
           onEngineStop={handleEngineStop}
           nodeCanvasObject={(node: GraphNode, ctx, globalScale) => {
             const label = node.name ?? '';
             const size  = nodeSize(node);
             const color = nodeColor(node);
 
-            // Glow for vulnerable nodes
             if (node.cveSeverity) { ctx.shadowBlur = 12; ctx.shadowColor = color; }
 
             ctx.beginPath();
             if (node.isRoot) {
-              // Diamond shape for root
               const s = size * 1.5;
               ctx.moveTo(node.x ?? 0, (node.y ?? 0) - s);
               ctx.lineTo((node.x ?? 0) + s, node.y ?? 0);
@@ -328,8 +326,7 @@ export function DependencyGraph({ projectName, onNodeClick }: DependencyGraphPro
               ctx.strokeStyle = color + '55'; ctx.lineWidth = 1.5; ctx.stroke();
             }
 
-            // ── Labels: only show when sufficiently zoomed in (> 2.5×) ──
-            // At normal zoom, labels are NOT shown — only the hover tooltip shows info
+            // Labels appear only when zoomed in sufficiently (> 2.5×)
             if (globalScale > 2.5) {
               const fontSize = Math.max(2.5, 9 / globalScale);
               ctx.font         = `${node.isRoot || node.isDirect ? 600 : 400} ${fontSize}px Inter,sans-serif`;
@@ -340,29 +337,27 @@ export function DependencyGraph({ projectName, onNodeClick }: DependencyGraphPro
             }
           }}
           linkColor={(link: GraphLink) => link.type === 'direct' ? '#4f8ef740' : '#1e273870'}
-          linkWidth={(link: GraphLink) => link.type === 'direct' ? 1.2 : 0.6}
+          linkWidth={(link: GraphLink) => link.type === 'direct' ? 1.2 : 0.5}
           onNodeClick={(node: GraphNode) => onNodeClick(node)}
           onNodeHover={(node: GraphNode | null) => setHoveredNode(node)}
           backgroundColor="#04070d"
         />
       )}
 
-      {ready && viewMode === '3d' && (
+      {/* ── 3D Graph ── */}
+      {viewMode === '3d' && (
         <ForceGraph3D
           ref={fgRef}
           graphData={data}
           nodeId="id"
-          // ── No nodeLabel / nodeThreeObject — hover tooltip handles info display ──
-          nodeLabel=""
+          nodeLabel=""       // no floating labels — hover tooltip handles it
           nodeColor={nodeColor}
           nodeVal={nodeSize}
-          width={dims.w}
-          height={dims.h}
-          cooldownTicks={120}
-          cooldownTime={3000}
+          width={containerW}
+          height={containerH}
           onEngineStop={handleEngineStop}
-          linkColor={(link: GraphLink) => link.type === 'direct' ? '#4f8ef748' : '#1e273888'}
-          linkWidth={(link: GraphLink) => link.type === 'direct' ? 1.8 : 0.8}
+          linkColor={(link: GraphLink) => link.type === 'direct' ? '#4f8ef748' : '#1e273880'}
+          linkWidth={(link: GraphLink) => link.type === 'direct' ? 1.8 : 0.7}
           onNodeClick={(node: GraphNode) => onNodeClick(node)}
           onNodeHover={(node: GraphNode | null) => setHoveredNode(node)}
           backgroundColor="#04070d"
