@@ -207,22 +207,6 @@ export function DependencyGraph({ projectName, onNodeClick }: Props) {
     setViewMode(mode);
   };
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100%', flexDirection: 'column', gap: '1rem', color: 'var(--text-muted)' }}>
-      <div style={{ fontSize: '2.5rem', animation: 'spin 1.5s linear infinite' }}>⚡</div>
-      <div style={{ fontSize: '0.9rem' }}>Loading dependency graph…</div>
-    </div>
-  );
-  if (error) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100%', flexDirection: 'column', gap: '0.75rem' }}>
-      <div style={{ fontSize: '2rem' }}>⚠️</div>
-      <div style={{ color: 'var(--accent-red)', fontWeight: 600 }}>Failed to load graph</div>
-      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: 360, textAlign: 'center' }}>{error}</div>
-    </div>
-  );
-
   const data = filteredData();
 
   return (
@@ -233,170 +217,191 @@ export function DependencyGraph({ projectName, onNodeClick }: Props) {
         if (r) setMousePos({ x: e.clientX - r.left, y: e.clientY - r.top });
       }}>
 
-      {/* ── Controls bar ── */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
-        background: 'linear-gradient(180deg,rgba(4,7,13,0.95) 0%,rgba(4,7,13,0.4) 80%,transparent 100%)',
-        padding: '10px 14px 22px',
-        display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center',
-      }}>
-        <input type="text" placeholder="🔍 Search packages…" value={filter.search}
-          onChange={e => setFilter(f => ({ ...f, search: e.target.value }))}
-          style={{
-            background: 'rgba(12,18,32,0.92)', border: '1px solid var(--border)',
-            color: 'var(--text-primary)', borderRadius: 8, padding: '5px 11px',
-            fontSize: '0.82rem', width: 180, outline: 'none', fontFamily: 'var(--font-sans)',
-          }}
-        />
-
-        <div style={{ display: 'flex', background: 'rgba(12,18,32,0.92)',
-          border: '1px solid var(--border)', borderRadius: 8, padding: 2 }}>
-          {(['2d', '3d'] as const).map(m => (
-            <button key={m} onClick={() => switchView(m)} style={{
-              background: viewMode === m ? 'var(--accent-blue)' : 'transparent',
-              color: viewMode === m ? '#fff' : 'var(--text-muted)',
-              border: 'none', borderRadius: 6, padding: '4px 12px',
-              fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-            }}>{m.toUpperCase()} Graph</button>
-          ))}
+      {loading && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
+          height: '100%', flexDirection: 'column', gap: '1rem', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '2.5rem', animation: 'spin 1.5s linear infinite' }}>⚡</div>
+          <div style={{ fontSize: '0.9rem' }}>Loading dependency graph…</div>
         </div>
+      )}
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.78rem',
-          color: 'var(--text-muted)', cursor: 'pointer', background: 'rgba(12,18,32,0.92)',
-          border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px' }}>
-          <input type="checkbox" checked={filter.showDev}
-            onChange={e => setFilter(f => ({ ...f, showDev: e.target.checked }))} /> Dev
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.78rem',
-          color: 'var(--text-muted)', cursor: 'pointer', background: 'rgba(12,18,32,0.92)',
-          border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px' }}>
-          <input type="checkbox" checked={filter.showVulnOnly}
-            onChange={e => setFilter(f => ({ ...f, showVulnOnly: e.target.checked }))} /> Vulns only
-        </label>
+      {error && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
+          height: '100%', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ fontSize: '2rem' }}>⚠️</div>
+          <div style={{ color: 'var(--accent-red)', fontWeight: 600 }}>Failed to load graph</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: 360, textAlign: 'center' }}>{error}</div>
+        </div>
+      )}
 
-        <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)',
-          background: 'rgba(12,18,32,0.92)', border: '1px solid var(--border)',
-          borderRadius: 6, padding: '4px 9px' }}>
-          {data.nodes.length} nodes · {data.links.length} edges
-        </span>
+      {!loading && !error && (
+        <>
+          {/* ── Controls bar ── */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+            background: 'linear-gradient(180deg,rgba(4,7,13,0.95) 0%,rgba(4,7,13,0.4) 80%,transparent 100%)',
+            padding: '10px 14px 22px',
+            display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center',
+          }}>
+            <input type="text" placeholder="🔍 Search packages…" value={filter.search}
+              onChange={e => setFilter(f => ({ ...f, search: e.target.value }))}
+              style={{
+                background: 'rgba(12,18,32,0.92)', border: '1px solid var(--border)',
+                color: 'var(--text-primary)', borderRadius: 8, padding: '5px 11px',
+                fontSize: '0.82rem', width: 180, outline: 'none', fontFamily: 'var(--font-sans)',
+              }}
+            />
 
-        {viewMode === '3d' && (
-          <span style={{ fontSize: '0.68rem', color: 'var(--text-faint)',
-            background: 'rgba(12,18,32,0.7)', border: '1px solid var(--border)',
-            borderRadius: 6, padding: '4px 8px', fontStyle: 'italic' }}>
-            🔍 Zoom in to see all labels
-          </span>
-        )}
+            <div style={{ display: 'flex', background: 'rgba(12,18,32,0.92)',
+              border: '1px solid var(--border)', borderRadius: 8, padding: 2 }}>
+              {(['2d', '3d'] as const).map(m => (
+                <button key={m} onClick={() => switchView(m)} style={{
+                  background: viewMode === m ? 'var(--accent-blue)' : 'transparent',
+                  color: viewMode === m ? '#fff' : 'var(--text-muted)',
+                  border: 'none', borderRadius: 6, padding: '4px 12px',
+                  fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                }}>{m.toUpperCase()} Graph</button>
+              ))}
+            </div>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-          {[{ color: '#a78bfa', label: 'Root' }, { color: '#4f8ef7', label: 'Direct' },
-            { color: '#556070', label: 'Transitive' }, { color: '#f87171', label: 'Vulnerable' }]
-            .map(({ color, label }) => (
-              <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4,
-                fontSize: '0.69rem', color: 'var(--text-muted)' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: color,
-                  display: 'inline-block', boxShadow: `0 0 5px ${color}88` }} />
-                {label}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.78rem',
+              color: 'var(--text-muted)', cursor: 'pointer', background: 'rgba(12,18,32,0.92)',
+              border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px' }}>
+              <input type="checkbox" checked={filter.showDev}
+                onChange={e => setFilter(f => ({ ...f, showDev: e.target.checked }))} /> Dev
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.78rem',
+              color: 'var(--text-muted)', cursor: 'pointer', background: 'rgba(12,18,32,0.92)',
+              border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px' }}>
+              <input type="checkbox" checked={filter.showVulnOnly}
+                onChange={e => setFilter(f => ({ ...f, showVulnOnly: e.target.checked }))} /> Vulns only
+            </label>
+
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)',
+              background: 'rgba(12,18,32,0.92)', border: '1px solid var(--border)',
+              borderRadius: 6, padding: '4px 9px' }}>
+              {data.nodes.length} nodes · {data.links.length} edges
+            </span>
+
+            {viewMode === '3d' && (
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-faint)',
+                background: 'rgba(12,18,32,0.7)', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '4px 8px', fontStyle: 'italic' }}>
+                🔍 Zoom in to see all labels
               </span>
-            ))}
-        </div>
-      </div>
+            )}
 
-      {/* ── Hover tooltip ── */}
-      {hoveredNode && (
-        <div style={{
-          position: 'absolute',
-          left: Math.min(mousePos.x + 16, dims.w - 260),
-          top:  Math.min(mousePos.y + 16, dims.h - 140),
-          zIndex: 20, pointerEvents: 'none',
-          background: 'rgba(8,13,22,0.97)', border: '1px solid var(--border-bright)',
-          borderRadius: 10, padding: '0.7rem 1rem', minWidth: 190, maxWidth: 240,
-          backdropFilter: 'blur(14px)', boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
-        }}>
-          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.875rem', marginBottom: 3 }}>
-            {hoveredNode.name}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              {[{ color: '#a78bfa', label: 'Root' }, { color: '#4f8ef7', label: 'Direct' },
+                { color: '#556070', label: 'Transitive' }, { color: '#f87171', label: 'Vulnerable' }]
+                .map(({ color, label }) => (
+                  <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4,
+                    fontSize: '0.69rem', color: 'var(--text-muted)' }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: color,
+                      display: 'inline-block', boxShadow: `0 0 5px ${color}88` }} />
+                    {label}
+                  </span>
+                ))}
+            </div>
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-faint)' }}>v{hoveredNode.version}</div>
-          {hoveredNode.healthScore !== undefined && (
-            <div style={{ fontSize: '0.72rem', marginTop: 5, color: HPH[hoveredNode.healthLabel ?? 'watch'] }}>
-              Health {hoveredNode.healthScore}/100 · {hoveredNode.healthLabel}
+
+          {/* ── Hover tooltip ── */}
+          {hoveredNode && (
+            <div style={{
+              position: 'absolute',
+              left: Math.min(mousePos.x + 16, dims.w - 260),
+              top:  Math.min(mousePos.y + 16, dims.h - 140),
+              zIndex: 20, pointerEvents: 'none',
+              background: 'rgba(8,13,22,0.97)', border: '1px solid var(--border-bright)',
+              borderRadius: 10, padding: '0.7rem 1rem', minWidth: 190, maxWidth: 240,
+              backdropFilter: 'blur(14px)', boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
+            }}>
+              <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.875rem', marginBottom: 3 }}>
+                {hoveredNode.name}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-faint)' }}>v{hoveredNode.version}</div>
+              {hoveredNode.healthScore !== undefined && (
+                <div style={{ fontSize: '0.72rem', marginTop: 5, color: HPH[hoveredNode.healthLabel ?? 'watch'] }}>
+                  Health {hoveredNode.healthScore}/100 · {hoveredNode.healthLabel}
+                </div>
+              )}
+              {hoveredNode.cveSeverity && (
+                <div style={{ fontSize: '0.72rem', marginTop: 5, color: SEV[hoveredNode.cveSeverity] ?? '#ff8800' }}>
+                  ⚠ {hoveredNode.cveSeverity.toUpperCase()} CVE
+                </div>
+              )}
+              <div style={{ fontSize: '0.67rem', marginTop: 5, color: 'var(--text-faint)' }}>
+                {hoveredNode.isRoot ? '◆ Root' : hoveredNode.isDirect ? '● Direct' : '○ Transitive'}
+                {hoveredNode.scope === 'development' ? '  [dev]' : ''}
+              </div>
             </div>
           )}
-          {hoveredNode.cveSeverity && (
-            <div style={{ fontSize: '0.72rem', marginTop: 5, color: SEV[hoveredNode.cveSeverity] ?? '#ff8800' }}>
-              ⚠ {hoveredNode.cveSeverity.toUpperCase()} CVE
-            </div>
+
+          {/* ── 2D Graph ── */}
+          {viewMode === '2d' && (
+            <ForceGraph2D
+              ref={fgRef}
+              graphData={data}
+              nodeId="id"
+              nodeLabel=""
+              nodeColor={nodeColor}
+              nodeVal={nodeSize}
+              width={dims.w}
+              height={dims.h}
+              onEngineStop={handleEngineStop}
+              nodeCanvasObject={(node: GraphNode, ctx, gs) => {
+                const lbl = node.name ?? '', sz = nodeSize(node), col = nodeColor(node);
+                if (node.cveSeverity) { ctx.shadowBlur = 12; ctx.shadowColor = col; }
+                ctx.beginPath();
+                if (node.isRoot) {
+                  const s = sz * 1.5;
+                  ctx.moveTo(node.x ?? 0, (node.y ?? 0) - s);
+                  ctx.lineTo((node.x ?? 0) + s, node.y ?? 0);
+                  ctx.lineTo(node.x ?? 0, (node.y ?? 0) + s);
+                  ctx.lineTo((node.x ?? 0) - s, node.y ?? 0);
+                  ctx.closePath();
+                } else {
+                  ctx.arc(node.x ?? 0, node.y ?? 0, sz, 0, 2 * Math.PI);
+                }
+                ctx.fillStyle = col; ctx.fill(); ctx.shadowBlur = 0;
+                if (node.isDirect && !node.isRoot) { ctx.strokeStyle = col + '55'; ctx.lineWidth = 1.5; ctx.stroke(); }
+                // Show labels only when zoomed in (gs > 2.5×)
+                if (gs > 2.5) {
+                  const fs = Math.max(2.5, 9 / gs);
+                  ctx.font = `${node.isRoot || node.isDirect ? 600 : 400} ${fs}px Inter,sans-serif`;
+                  ctx.fillStyle = node.isRoot ? '#e8eef8' : node.isDirect ? '#93c5fd' : '#8b99b8';
+                  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                  ctx.fillText(lbl, node.x ?? 0, (node.y ?? 0) + sz + 1.5);
+                }
+              }}
+              linkColor={(l: GraphLink) => l.type === 'direct' ? '#4f8ef740' : '#1e273870'}
+              linkWidth={(l: GraphLink) => l.type === 'direct' ? 1.2 : 0.5}
+              onNodeClick={(n: GraphNode) => onNodeClick(n)}
+              onNodeHover={(n: GraphNode | null) => setHoveredNode(n)}
+              backgroundColor="#04070d"
+            />
           )}
-          <div style={{ fontSize: '0.67rem', marginTop: 5, color: 'var(--text-faint)' }}>
-            {hoveredNode.isRoot ? '◆ Root' : hoveredNode.isDirect ? '● Direct' : '○ Transitive'}
-            {hoveredNode.scope === 'development' ? '  [dev]' : ''}
-          </div>
-        </div>
-      )}
 
-      {/* ── 2D Graph ── */}
-      {viewMode === '2d' && (
-        <ForceGraph2D
-          ref={fgRef}
-          graphData={data}
-          nodeId="id"
-          nodeLabel=""
-          nodeColor={nodeColor}
-          nodeVal={nodeSize}
-          width={dims.w}
-          height={dims.h}
-          onEngineStop={handleEngineStop}
-          nodeCanvasObject={(node: GraphNode, ctx, gs) => {
-            const lbl = node.name ?? '', sz = nodeSize(node), col = nodeColor(node);
-            if (node.cveSeverity) { ctx.shadowBlur = 12; ctx.shadowColor = col; }
-            ctx.beginPath();
-            if (node.isRoot) {
-              const s = sz * 1.5;
-              ctx.moveTo(node.x ?? 0, (node.y ?? 0) - s);
-              ctx.lineTo((node.x ?? 0) + s, node.y ?? 0);
-              ctx.lineTo(node.x ?? 0, (node.y ?? 0) + s);
-              ctx.lineTo((node.x ?? 0) - s, node.y ?? 0);
-              ctx.closePath();
-            } else {
-              ctx.arc(node.x ?? 0, node.y ?? 0, sz, 0, 2 * Math.PI);
-            }
-            ctx.fillStyle = col; ctx.fill(); ctx.shadowBlur = 0;
-            if (node.isDirect && !node.isRoot) { ctx.strokeStyle = col + '55'; ctx.lineWidth = 1.5; ctx.stroke(); }
-            // Show labels only when zoomed in (gs > 2.5×)
-            if (gs > 2.5) {
-              const fs = Math.max(2.5, 9 / gs);
-              ctx.font = `${node.isRoot || node.isDirect ? 600 : 400} ${fs}px Inter,sans-serif`;
-              ctx.fillStyle = node.isRoot ? '#e8eef8' : node.isDirect ? '#93c5fd' : '#8b99b8';
-              ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-              ctx.fillText(lbl, node.x ?? 0, (node.y ?? 0) + sz + 1.5);
-            }
-          }}
-          linkColor={(l: GraphLink) => l.type === 'direct' ? '#4f8ef740' : '#1e273870'}
-          linkWidth={(l: GraphLink) => l.type === 'direct' ? 1.2 : 0.5}
-          onNodeClick={(n: GraphNode) => onNodeClick(n)}
-          onNodeHover={(n: GraphNode | null) => setHoveredNode(n)}
-          backgroundColor="#04070d"
-        />
-      )}
-
-      {/* ── 3D Graph ── */}
-      {viewMode === '3d' && (
-        <ForceGraph3D
-          ref={fgRef}
-          graphData={data}
-          nodeId="id"
-          nodeLabel=""
-          nodeThreeObject={nodeThreeObject}
-          nodeThreeObjectExtend={false}
-          width={dims.w}
-          height={dims.h}
-          onEngineStop={handleEngineStop}
-          linkColor={(l: GraphLink) => l.type === 'direct' ? '#4f8ef748' : '#1e273880'}
-          linkWidth={(l: GraphLink) => l.type === 'direct' ? 1.8 : 0.7}
-          onNodeClick={(n: GraphNode) => onNodeClick(n)}
-          onNodeHover={(n: GraphNode | null) => setHoveredNode(n)}
-          backgroundColor="#04070d"
-        />
+          {/* ── 3D Graph ── */}
+          {viewMode === '3d' && (
+            <ForceGraph3D
+              ref={fgRef}
+              graphData={data}
+              nodeId="id"
+              nodeLabel=""
+              nodeThreeObject={nodeThreeObject}
+              nodeThreeObjectExtend={false}
+              width={dims.w}
+              height={dims.h}
+              onEngineStop={handleEngineStop}
+              linkColor={(l: GraphLink) => l.type === 'direct' ? '#4f8ef748' : '#1e273880'}
+              linkWidth={(l: GraphLink) => l.type === 'direct' ? 1.8 : 0.7}
+              onNodeClick={(n: GraphNode) => onNodeClick(n)}
+              onNodeHover={(n: GraphNode | null) => setHoveredNode(n)}
+              backgroundColor="#04070d"
+            />
+          )}
+        </>
       )}
     </div>
   );
