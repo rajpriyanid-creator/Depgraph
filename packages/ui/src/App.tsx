@@ -196,6 +196,11 @@ export default function App() {
                 value={localPath} onChange={e => setLocalPath(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !scanning && void handleScanLocal()}
                 disabled={scanning} style={inputStyle} />
+              {window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && (
+                <div style={{ fontSize: '0.62rem', color: '#f87171', marginBottom: '0.45rem', lineHeight: 1.3 }}>
+                  ⚠️ Note: DepGraph is running on a remote cloud server. It cannot scan directories on your local computer. Run DepGraph locally to scan local directories.
+                </div>
+              )}
               <button onClick={() => void handleScanLocal()} disabled={scanning || (!localPath.trim() && !workspacePath)}
                 style={btnStyle(scanning || (!localPath.trim() && !workspacePath), '#a78bfa')}>
                 {scanningLocal ? <><Spinner /> Scanning…</> : (localPath.trim() ? '📁 Analyze Local' : '📁 Analyze Workspace')}
