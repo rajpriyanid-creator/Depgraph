@@ -480,9 +480,6 @@ export default function App() {
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                     {dbConfig.isConnected ? 'Connected' : 'Disconnected / Offline'}
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-faint)', marginTop: 2 }}>
-                    Active: <code style={{ fontFamily: 'var(--font-mono)' }}>{dbConfig.uri}</code> ({dbConfig.username})
-                  </div>
                 </div>
                 {dbConfig.isConnected && (
                   <span style={{
