@@ -38,23 +38,14 @@ export default function App() {
   const [suggestedPath,    setSuggestedPath]    = useState<string>('');
   const [initializingPkg,  setInitializingPkg]  = useState(false);
 
-  // Database Connection settings state
-  const [showDbSettings,  setShowDbSettings]  = useState(false);
-  const [dbConfig,        setDbConfig]        = useState<{ uri: string; username: string; isConnected: boolean; isAura: boolean } | null>(null);
-  const [dbUri,           setDbUri]           = useState('');
-  const [dbUser,          setDbUser]          = useState('');
-  const [dbPass,          setDbPass]          = useState('');
-  const [dbSaving,        setDbSaving]        = useState(false);
-  const [dbError,         setDbError]         = useState<string | null>(null);
-  const [dbSuccess,       setDbSuccess]       = useState<string | null>(null);
+  // Database Connection status state
+  const [dbConfig,        setDbConfig]        = useState<{ isConnected: boolean; isAura: boolean } | null>(null);
 
   const loadDbConfig = () => {
     fetch('/api/db-config')
       .then(r => r.json())
       .then(d => {
         setDbConfig(d);
-        setDbUri(d.uri || '');
-        setDbUser(d.username || '');
       })
       .catch(() => {});
   };
@@ -124,43 +115,6 @@ export default function App() {
     finally { setInitializingPkg(false); }
   };
 
-  const handleSaveDbConfig = async () => {
-    setDbSaving(true); setDbError(null); setDbSuccess(null);
-    try {
-      const res = await fetch('/api/db-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uri: dbUri.trim(), username: dbUser.trim(), password: dbPass }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to update database configuration');
-      setDbSuccess('Successfully connected and saved database configuration!');
-      setDbPass('');
-      loadDbConfig();
-      void loadProjects();
-    } catch (err: any) {
-      setDbError(err.message ?? String(err));
-    } finally {
-      setDbSaving(false);
-    }
-  };
-
-  const handleResetDbConfig = async () => {
-    setDbSaving(true); setDbError(null); setDbSuccess(null);
-    try {
-      const res = await fetch('/api/db-config/reset', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to reset database configuration');
-      setDbSuccess('Reset database configuration to environment defaults.');
-      setDbPass('');
-      loadDbConfig();
-      void loadProjects();
-    } catch (err: any) {
-      setDbError(err.message ?? String(err));
-    } finally {
-      setDbSaving(false);
-    }
-  };
 
   const handleTabChange = (tab: Tab) => { setActiveTab(tab); if (tab !== 'graph') setSelectedNode(null); };
   const activeTabInfo = TABS.find(t => t.id === activeTab)!;
@@ -315,31 +269,43 @@ export default function App() {
         </div>
 
         <div style={{ padding: sidebarOpen ? '0.5rem 0.85rem' : '0.5rem 0', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'center' }}>
-          <button onClick={() => setShowDbSettings(true)} style={{
-            width: sidebarOpen ? '100%' : '32px', height: sidebarOpen ? 'auto' : '32px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: sidebarOpen ? '0.5rem' : 0,
-            background: 'none', border: '1px solid var(--border)', borderRadius: 8,
-            color: 'var(--text-muted)', fontSize: '0.78rem', padding: sidebarOpen ? '6px 12px' : 0,
-            cursor: 'pointer', transition: 'all 0.15s ease',
-          }} onMouseEnter={e => {
-            e.currentTarget.style.borderColor = 'var(--accent-blue)';
-            e.currentTarget.style.color = 'var(--text-primary)';
-          }} onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'var(--border)';
-            e.currentTarget.style.color = 'var(--text-muted)';
-          }} title="Database settings">
-            <span>⚙️</span>
-            {sidebarOpen && (
+          {sidebarOpen ? (
+            <div style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
+              border: '1px solid var(--border)', borderRadius: 8,
+              background: 'rgba(8,13,22,0.4)', color: 'var(--text-muted)', fontSize: '0.78rem', padding: '8px 12px',
+            }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: dbConfig?.isConnected ? '#34d399' : '#f87171',
+                boxShadow: `0 0 8px ${dbConfig?.isConnected ? '#34d399' : '#f87171'}`,
+                display: 'inline-block'
+              }} />
               <div style={{ textAlign: 'left', flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontWeight: 500 }}>DB Settings</div>
-                {dbConfig && (
-                  <div style={{ fontSize: '0.58rem', color: dbConfig.isConnected ? '#34d399' : '#f87171', marginTop: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                    ● {dbConfig.isConnected ? (dbConfig.isAura ? 'AuraDB Cloud' : 'Local Connected') : 'Disconnected'}
+                <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                  Database: {dbConfig?.isConnected ? 'Connected' : 'Offline'}
+                </div>
+                {dbConfig?.isConnected && (
+                  <div style={{ fontSize: '0.62rem', color: dbConfig.isAura ? '#c084fc' : '#60a5fa', marginTop: 1 }}>
+                    {dbConfig.isAura ? 'AuraDB Cloud' : 'Local Instance'}
                   </div>
                 )}
               </div>
-            )}
-          </button>
+            </div>
+          ) : (
+            <div title={dbConfig?.isConnected ? (dbConfig.isAura ? 'Connected to AuraDB Cloud' : 'Connected to Local Instance') : 'Database Offline'}
+              style={{
+                width: 28, height: 28, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(8,13,22,0.4)', border: '1px solid var(--border)'
+              }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: dbConfig?.isConnected ? '#34d399' : '#f87171',
+                boxShadow: `0 0 8px ${dbConfig?.isConnected ? '#34d399' : '#f87171'}`
+              }} />
+            </div>
+          )}
         </div>
 
         {sidebarOpen && (
@@ -446,121 +412,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Database Connection Settings Modal */}
-      {showDbSettings && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(4,7,13,0.88)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 9999, backdropFilter: 'blur(8px)', animation: 'fadeIn 0.2s ease' }}>
-          <div style={{ background: 'linear-gradient(135deg, #0c1424, #0f1a2e)', border: '1px solid var(--border-bright)',
-            borderRadius: 16, width: '90%', maxWidth: 500, padding: '1.75rem',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.7)', display: 'flex', flexDirection: 'column', gap: '1.25rem',
-            animation: 'slideIn 0.25s ease' }}>
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 6px',
-                display: 'flex', alignItems: 'center', gap: 8 }}>
-                ⚙️ Database Connection Settings
-              </h3>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                Configure connection credentials for your Neo4j database instance. This app works seamlessly with local instances and cloud instances like <strong>Neo4j AuraDB</strong>.
-              </p>
-            </div>
 
-            {/* Connection Status indicator */}
-            {dbConfig && (
-              <div style={{
-                background: 'rgba(8,13,22,0.8)', border: '1px solid var(--border)',
-                borderRadius: 10, padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem'
-              }}>
-                <div style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: dbConfig.isConnected ? '#34d399' : '#f87171',
-                  boxShadow: `0 0 8px ${dbConfig.isConnected ? '#34d399' : '#f87171'}`
-                }} />
-                <div style={{ flex: 1, fontSize: '0.8rem' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {dbConfig.isConnected ? 'Connected' : 'Disconnected / Offline'}
-                  </div>
-                </div>
-                {dbConfig.isConnected && (
-                  <span style={{
-                    fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
-                    color: dbConfig.isAura ? '#c084fc' : '#60a5fa',
-                    background: dbConfig.isAura ? '#c084fc18' : '#60a5fa18',
-                    border: `1px solid ${dbConfig.isAura ? '#c084fc33' : '#60a5fa33'}`,
-                    padding: '2px 8px', borderRadius: 4
-                  }}>
-                    {dbConfig.isAura ? 'AuraDB Cloud' : 'Local Host'}
-                  </span>
-                )}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-faint)',
-                  textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Connection URI</label>
-                <input type="text" placeholder="neo4j+s://xxxxxx.databases.neo4j.io" value={dbUri}
-                  onChange={e => setDbUri(e.target.value)} disabled={dbSaving} style={inputStyle} />
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-faint)',
-                    textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Username</label>
-                  <input type="text" placeholder="neo4j" value={dbUser}
-                    onChange={e => setDbUser(e.target.value)} disabled={dbSaving} style={inputStyle} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-faint)',
-                    textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Password</label>
-                  <input type="password" placeholder="••••••••••••" value={dbPass}
-                    onChange={e => setDbPass(e.target.value)} disabled={dbSaving} style={{ ...inputStyle, marginBottom: 0 }} />
-                </div>
-              </div>
-            </div>
-
-            {dbError && (
-              <div style={{ padding: '0.6rem 0.85rem', borderRadius: 8, background: 'rgba(248,113,113,0.08)',
-                border: '1px solid rgba(248,113,113,0.25)', color: '#f87171', fontSize: '0.73rem', lineHeight: 1.45 }}>
-                ⚠ {dbError}
-              </div>
-            )}
-
-            {dbSuccess && (
-              <div style={{ padding: '0.6rem 0.85rem', borderRadius: 8, background: 'rgba(52,211,153,0.1)',
-                border: '1px solid rgba(52,211,153,0.3)', color: '#34d399', fontSize: '0.73rem', lineHeight: 1.45 }}>
-                ✅ {dbSuccess}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.25rem' }}>
-              <button onClick={() => void handleResetDbConfig()} disabled={dbSaving}
-                style={{ background: 'transparent', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171',
-                  borderRadius: 8, padding: '7px 12px', fontSize: '0.78rem', cursor: dbSaving ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.15s ease' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(248,113,113,0.08)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                Reset to Defaults
-              </button>
-
-              <div style={{ display: 'flex', gap: '0.6rem' }}>
-                <button onClick={() => { setShowDbSettings(false); setDbError(null); setDbSuccess(null); }}
-                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-bright)', color: 'var(--text-secondary)',
-                    borderRadius: 8, padding: '7px 14px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
-                  Close
-                </button>
-                <button onClick={() => void handleSaveDbConfig()} disabled={dbSaving || !dbUri.trim() || !dbUser.trim()}
-                  style={{ background: 'var(--gradient-brand)', border: 'none', color: '#fff',
-                    borderRadius: 8, padding: '7px 16px', fontSize: '0.78rem', fontWeight: 600,
-                    cursor: (dbSaving || !dbUri.trim() || !dbUser.trim()) ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 4px 16px rgba(79,142,247,0.4)' }}>
-                  {dbSaving ? '⏳ Testing…' : 'Test & Save'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
