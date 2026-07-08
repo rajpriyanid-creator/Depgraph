@@ -34,8 +34,7 @@ export async function findDuplicates(_projectName: string): Promise<DuplicateGro
          bundleSize: v.bundleSize,
          requiredBy: [(req)-[:DEPENDS_ON]->(v) | req.name]
        }] AS versionDetails
-     ORDER BY size(versions) DESC
-     LIMIT 100`,
+     ORDER BY size(versions) DESC`,
     {},
   );
 
