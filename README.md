@@ -10,7 +10,7 @@ DepGraph resolves your entire dependency tree into a rich **Neo4j knowledge grap
 
 **Try it now →** [https://depgraph-ad8z.onrender.com](https://depgraph-ad8z.onrender.com)
 
-Scan any public GitHub repository or local project directly from the web UI. No installation required for the cloud version.
+Scan any public GitHub repository or local project directly from the web UI. No installation required for the cloud version. 
 
 ---
 
@@ -77,7 +77,23 @@ docker compose -f docker/docker-compose.yml up -d
 # Bolt: bolt://localhost:7687  |  Credentials: neo4j / depgraph
 ```
 
-### 3. Launch the Dashboard
+### 3. Database Configuration
+
+By default, DepGraph reads database connection credentials from process environment variables.
+
+*   **Local Development**: Connects automatically to the local Docker Compose instance (`bolt://localhost:7687`).
+*   **AuraDB / Custom Instance**: Configure your target database credentials using the environment variables (`NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`) or by placing a `.depgraph-db.json` file in the repository root:
+    ```json
+    {
+      "uri": "neo4j+s://your-instance.databases.neo4j.io",
+      "username": "neo4j",
+      "password": "your-password"
+    }
+    ```
+
+The web dashboard displays your current database connection status (Connected/Offline, Local/AuraDB) directly in the sidebar footer.
+
+### 4. Launch the Dashboard
 
 ```bash
 node packages/cli/dist/index.js serve
