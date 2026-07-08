@@ -1,5 +1,5 @@
 // Graph database
-export { getDriver, closeDriver, runQuery, runReadQuery, runTransaction } from './graph/db.js';
+export { getDriver, closeDriver, runQuery, runReadQuery, runTransaction, saveDbConfig, resetDbConfig, getDbConfig, checkConnection } from './graph/db.js';
 export { initSchema } from './graph/schema.js';
 export { GraphIngester } from './graph/ingester.js';
 export type { NormalizedGraph } from './graph/ingester.js';

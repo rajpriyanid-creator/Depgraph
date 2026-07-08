@@ -72,6 +72,10 @@ import {
   VulnerabilityEnricher,
   computeHealthScore,
   scanImports,
+  saveDbConfig,
+  resetDbConfig,
+  getDbConfig,
+  checkConnection,
 } from '@depgraph/core';
 
 interface ServeOptions {
@@ -596,6 +600,49 @@ export async function runServe(options: ServeOptions): Promise<void> {
         );
       }
       res.json({ success: true, computed: pkgs.length });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.get('/api/db-config', async (req, res) => {
+    try {
+      const config = getDbConfig();
+      const isConnected = await checkConnection();
+      const isAura = config.uri.startsWith('neo4j+s://') || config.uri.startsWith('neo4j+sbc://') || config.uri.includes('.databases.neo4j.io');
+      res.json({
+        uri: config.uri,
+        username: config.username,
+        isConnected,
+        isAura,
+      });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.post('/api/db-config', async (req, res) => {
+    try {
+      const { uri, username, password } = req.body;
+      if (!uri || !username) {
+        return res.status(400).json({ error: 'URI and Username are required' });
+      }
+      await saveDbConfig(uri, username, password);
+      try {
+        await initSchema();
+      } catch (e) {
+        console.warn('Failed to initialize schema on new database:', e);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.post('/api/db-config/reset', async (req, res) => {
+    try {
+      await resetDbConfig();
+      res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: String(err) });
     }

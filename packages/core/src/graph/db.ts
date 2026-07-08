@@ -1,20 +1,45 @@
 import neo4j, { type Driver, type Record as Neo4jRecord } from 'neo4j-driver';
+import { writeFileSync, existsSync, readFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
 
-const DEFAULT_URI = process.env['NEO4J_URI'] ?? 'bolt://localhost:7687';
-const DEFAULT_USER = process.env['NEO4J_USERNAME'] ?? 'neo4j';
-const DEFAULT_PASS = process.env['NEO4J_PASSWORD'] ?? 'depgraph';
+const CONFIG_PATH = join(process.cwd(), '.depgraph-db.json');
+
+interface DbConfig {
+  uri?: string;
+  username?: string;
+  password?: string;
+}
+
+let activeConfig: DbConfig | null = null;
+
+function loadConfig(): DbConfig | null {
+  try {
+    if (existsSync(CONFIG_PATH)) {
+      const raw = readFileSync(CONFIG_PATH, 'utf8');
+      return JSON.parse(raw) as DbConfig;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
 
 let driverInstance: Driver | null = null;
 
 /**
  * Returns the singleton Neo4j driver instance.
- * Creates it on first call using environment variables.
+ * Creates it on first call using environment variables or config.
  */
 export function getDriver(uri?: string, username?: string, password?: string): Driver {
   if (!driverInstance) {
+    const config = activeConfig || loadConfig() || {};
+    const activeUri = uri ?? config.uri ?? process.env['NEO4J_URI'] ?? 'bolt://localhost:7687';
+    const activeUser = username ?? config.username ?? process.env['NEO4J_USERNAME'] ?? 'neo4j';
+    const activePass = password ?? config.password ?? process.env['NEO4J_PASSWORD'] ?? 'depgraph';
+
     driverInstance = neo4j.driver(
-      uri ?? DEFAULT_URI,
-      neo4j.auth.basic(username ?? DEFAULT_USER, password ?? DEFAULT_PASS),
+      activeUri,
+      neo4j.auth.basic(activeUser, activePass),
       {
         maxConnectionPoolSize: 50,
         connectionAcquisitionTimeout: 10_000,
@@ -113,4 +138,62 @@ function convertNeo4jValue(val: unknown): unknown {
     );
   }
   return val;
+}
+
+export async function saveDbConfig(uri: string, username: string, password?: string): Promise<void> {
+  const testDriver = neo4j.driver(
+    uri,
+    neo4j.auth.basic(username, password ?? ''),
+    { connectionAcquisitionTimeout: 5000 }
+  );
+  try {
+    const session = testDriver.session();
+    await session.run('RETURN 1');
+    await session.close();
+  } catch (err) {
+    await testDriver.close();
+    throw new Error(`Failed to connect to database: ${(err as Error).message}`);
+  } finally {
+    await testDriver.close();
+  }
+
+  const data: DbConfig = { uri, username };
+  if (password !== undefined) {
+    data.password = password;
+  }
+  writeFileSync(CONFIG_PATH, JSON.stringify(data, null, 2), 'utf8');
+  activeConfig = data;
+  await closeDriver();
+}
+
+export async function resetDbConfig(): Promise<void> {
+  if (existsSync(CONFIG_PATH)) {
+    try {
+      unlinkSync(CONFIG_PATH);
+    } catch {
+      // ignore
+    }
+  }
+  activeConfig = null;
+  await closeDriver();
+}
+
+export function getDbConfig(): { uri: string; username: string } {
+  const config = activeConfig || loadConfig() || {};
+  return {
+    uri: config.uri ?? process.env['NEO4J_URI'] ?? 'bolt://localhost:7687',
+    username: config.username ?? process.env['NEO4J_USERNAME'] ?? 'neo4j',
+  };
+}
+
+export async function checkConnection(): Promise<boolean> {
+  try {
+    const driver = getDriver();
+    const session = driver.session({ defaultAccessMode: neo4j.session.READ });
+    await session.run('RETURN 1');
+    await session.close();
+    return true;
+  } catch {
+    return false;
+  }
 }
