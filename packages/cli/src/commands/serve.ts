@@ -300,12 +300,50 @@ export async function runServe(options: ServeOptions): Promise<void> {
       const targetPath = scans[0].projectPath;
       const pkgJsonPath = join(targetPath, 'package.json');
 
-      if (!existsSync(pkgJsonPath)) {
-        return res.status(404).json({ error: 'package.json not found in project path.' });
-      }
+      let pkgJsonStr: string;
+      let pkg: any;
+      let packageManager = 'npm';
 
-      const pkgJsonStr = readFileSync(pkgJsonPath, 'utf8');
-      const pkg = JSON.parse(pkgJsonStr);
+      if (existsSync(pkgJsonPath)) {
+        // File exists on disk — read it directly
+        pkgJsonStr = readFileSync(pkgJsonPath, 'utf8');
+        pkg = JSON.parse(pkgJsonStr);
+
+        // Detect package manager from lockfiles
+        if (existsSync(join(targetPath, 'pnpm-lock.yaml'))) {
+          packageManager = 'pnpm';
+        } else if (existsSync(join(targetPath, 'yarn.lock'))) {
+          packageManager = 'yarn';
+        }
+      } else {
+        // File no longer on disk (e.g. Render ephemeral FS wiped the clone).
+        // Reconstruct a synthetic package.json from Neo4j graph data.
+        const directDeps = await runReadQuery<{ name: string; version: string; scope: string }>(
+          `MATCH (root:Package {isRoot: true, name: $projectName})-[:DEPENDS_ON]->(p:Package)
+           WHERE p.isDirect = true
+           RETURN DISTINCT p.name AS name, p.version AS version, p.scope AS scope`,
+          { projectName },
+        );
+
+        const deps: Record<string, string> = {};
+        const devDeps: Record<string, string> = {};
+        for (const d of directDeps) {
+          const ver = d.version ? `^${d.version}` : '*';
+          if (d.scope === 'development') {
+            devDeps[d.name] = ver;
+          } else {
+            deps[d.name] = ver;
+          }
+        }
+
+        pkg = {
+          name: projectName,
+          version: '1.0.0',
+          dependencies: deps,
+          ...(Object.keys(devDeps).length > 0 ? { devDependencies: devDeps } : {}),
+        };
+        pkgJsonStr = JSON.stringify(pkg, null, 2);
+      }
 
       // Find vulnerability paths
       const paths = await findVulnerabilityPaths(projectName);
@@ -389,14 +427,6 @@ export async function runServe(options: ServeOptions): Promise<void> {
 
       fixInvalidVersion(updatedPkg.dependencies);
       fixInvalidVersion(updatedPkg.devDependencies);
-
-      // Detect package manager
-      let packageManager = 'npm';
-      if (existsSync(join(targetPath, 'pnpm-lock.yaml'))) {
-        packageManager = 'pnpm';
-      } else if (existsSync(join(targetPath, 'yarn.lock'))) {
-        packageManager = 'yarn';
-      }
 
       for (const [name, version] of fixes.entries()) {
         const detail = vulnDetails.get(name);
