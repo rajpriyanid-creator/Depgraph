@@ -485,7 +485,36 @@ export async function runServe(options: ServeOptions): Promise<void> {
       const targetPath = scans[0].projectPath;
       const pkgJsonPath = join(targetPath, 'package.json');
 
+      // 1. Write fixed package.json to disk
       writeFileSync(pkgJsonPath, fixedContent, 'utf8');
+
+      // 2. Re-ingest the project so Neo4j graph reflects the updated dependencies
+      try {
+        await initSchema();
+        const reader = new NpmReader();
+        const raw = await reader.read(targetPath);
+        raw.projectName = projectName;
+
+        const graph = normalizeNpm(raw);
+
+        const ingester = new GraphIngester();
+        await ingester.ingest(graph);
+
+        // 3. Re-run vulnerability enrichment against the new graph
+        try {
+          const enricher = new VulnerabilityEnricher();
+          await enricher.enrich(graph.scan.id);
+        } catch (enrichErr) {
+          console.warn(`Post-fix vulnerability enrichment warning: ${enrichErr}`);
+        }
+      } catch (reingestErr) {
+        // File was written successfully, but re-ingestion failed
+        console.warn(`Post-fix re-ingestion warning: ${reingestErr}`);
+        return res.json({
+          success: true,
+          warning: 'package.json was updated but the graph could not be automatically refreshed. Please run a manual rescan.',
+        });
+      }
 
       res.json({ success: true });
     } catch (err) {
