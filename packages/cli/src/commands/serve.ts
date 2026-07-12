@@ -699,10 +699,11 @@ export async function runServe(options: ServeOptions): Promise<void> {
       }>(
         `MATCH (root:Package {isRoot: true, name: $name})-[:DEPENDS_ON*0..20]->(p:Package)
          OPTIONAL MATCH (root)-[r:DEPENDS_ON]->(p)
-         WITH root, p, r,
-              EXISTS { (root)-[:DEPENDS_ON {scope: 'production'}]-[:DEPENDS_ON*0..19]->(p) } AS isProd
+         WITH root, p, r
+         OPTIONAL MATCH path = (root)-[:DEPENDS_ON*0..20]->(p)
+           WHERE all(rel IN relationships(path) WHERE rel.scope = 'production')
          RETURN DISTINCT p.id AS id, p.name AS name, p.version AS version,
-           (CASE WHEN isProd OR p.name = $name THEN 'production' ELSE 'development' END) AS scope,
+           (CASE WHEN path IS NOT NULL OR p.name = $name THEN 'production' ELSE 'development' END) AS scope,
            (CASE WHEN r IS NOT NULL THEN true ELSE false END) AS isDirect,
            (CASE WHEN p.name = $name THEN true ELSE false END) AS isRoot,
            p.cveSeverity AS cveSeverity, p.healthScore AS healthScore,
