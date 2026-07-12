@@ -24,7 +24,7 @@ export async function findDuplicates(_projectName: string): Promise<DuplicateGro
     versionDetails: Array<{ version: string; bundleSize?: number; requiredBy: string[] }>;
   }>(
     `MATCH (root:Package {isRoot: true, name: $projectName})-[:DEPENDS_ON*0..20]->(p:Package)
-     WITH p.name AS name, collect(p) AS versions
+     WITH p.name AS name, collect(DISTINCT p) AS versions
      WHERE size(versions) > 1
      RETURN
        name,
