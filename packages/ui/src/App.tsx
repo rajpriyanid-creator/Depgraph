@@ -40,6 +40,7 @@ export default function App() {
 
   // Database Connection status state
   const [dbConfig,        setDbConfig]        = useState<{ isConnected: boolean; isAura: boolean } | null>(null);
+  const [scannersExpanded, setScannersExpanded] = useState(false);
 
   const loadDbConfig = () => {
     fetch('/api/db-config')
@@ -174,77 +175,8 @@ export default function App() {
             color: 'var(--text-faint)', padding: '0.6rem 0', fontSize: '0.7rem', width: '100%', borderBottom: '1px solid var(--border)' }}>▶</button>
         )}
 
-        {/* Scan sections */}
-        {sidebarOpen && (
-          <div style={{ overflowY: 'auto', flex: 1 }}>
-
-            {/* Repo scanner */}
-            <SideSection title="Scan Repository">
-              <input type="text" placeholder="github.com/user/repo" value={repoUrl}
-                onChange={e => setRepoUrl(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !scanning && void handleScanRepo()}
-                disabled={scanning} style={inputStyle} />
-              <button onClick={() => void handleScanRepo()} disabled={scanning || !repoUrl.trim()}
-                style={btnStyle(scanning || !repoUrl.trim(), '#4f8ef7')}>
-                {scanningRepo ? <><Spinner /> Cloning…</> : '🔍 Analyze Repo'}
-              </button>
-            </SideSection>
-
-            {/* Local scanner */}
-            <SideSection title="Scan Local Path">
-              <input type="text" placeholder={workspacePath ? `${workspacePath}` : 'C:\\projects\\my-app'}
-                value={localPath} onChange={e => setLocalPath(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !scanning && void handleScanLocal()}
-                disabled={scanning} style={inputStyle} />
-              {window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && (
-                <div style={{ fontSize: '0.62rem', color: '#f87171', marginBottom: '0.45rem', lineHeight: 1.3 }}>
-                  ⚠️ Note: DepGraph is running on a remote cloud server. It cannot scan directories on your local computer. Run DepGraph locally to scan local directories.
-                </div>
-              )}
-              <button onClick={() => void handleScanLocal()} disabled={scanning || (!localPath.trim() && !workspacePath)}
-                style={btnStyle(scanning || (!localPath.trim() && !workspacePath), '#a78bfa')}>
-                {scanningLocal ? <><Spinner /> Scanning…</> : (localPath.trim() ? '📁 Analyze Local' : '📁 Analyze Workspace')}
-              </button>
-            </SideSection>
-
-            {/* Status messages */}
-            {scanSuccess && (
-              <div style={{ margin: '0 0.85rem 0.6rem', padding: '0.55rem 0.75rem', borderRadius: 8,
-                background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)',
-                color: '#34d399', fontSize: '0.73rem', lineHeight: 1.45, animation: 'slideIn 0.2s ease' }}>
-                ✅ {scanSuccess}
-              </div>
-            )}
-            {scanError && (
-              <div style={{ margin: '0 0.85rem 0.6rem', padding: '0.55rem 0.75rem', borderRadius: 8,
-                background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)',
-                color: '#f87171', fontSize: '0.73rem', lineHeight: 1.45 }}>
-                ⚠ {scanError}
-              </div>
-            )}
-
-            {/* Project picker */}
-            <SideSection title="Active Project">
-              {loadingProjects ? (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-faint)', display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <Spinner /> Loading…
-                </div>
-              ) : projects.length === 0 ? (
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-faint)', lineHeight: 1.5 }}>
-                  No scans yet. Paste a GitHub URL above ↑
-                </div>
-              ) : (
-                <select value={projectName} onChange={e => { setProjectName(e.target.value); setSelectedNode(null); }}
-                  style={{ ...inputStyle, cursor: 'pointer' }}>
-                  {projects.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              )}
-            </SideSection>
-          </div>
-        )}
-
         {/* Nav tabs */}
-        <div style={{ padding: sidebarOpen ? '0.5rem 0' : '0.5rem 0', borderTop: '1px solid var(--border)', flex: sidebarOpen ? 0 : 1 }}>
+        <div style={{ padding: '0.5rem 0', flexShrink: 0 }}>
           {TABS.map(tab => {
             const active = activeTab === tab.id;
             return (
@@ -272,6 +204,97 @@ export default function App() {
             );
           })}
         </div>
+
+        {/* Scan/Ingest & Active Project section */}
+        {sidebarOpen && (
+          <div style={{ overflowY: 'auto', flex: 1, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+            {/* Project picker */}
+            <SideSection title="Active Project">
+              {loadingProjects ? (
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-faint)', display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <Spinner /> Loading…
+                </div>
+              ) : projects.length === 0 ? (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-faint)', lineHeight: 1.5 }}>
+                  No scans yet. Ingest a project below ↓
+                </div>
+              ) : (
+                <select value={projectName} onChange={e => { setProjectName(e.target.value); setSelectedNode(null); }}
+                  style={{ ...inputStyle, cursor: 'pointer', marginBottom: 0 }}>
+                  {projects.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              )}
+            </SideSection>
+
+            {/* Collapsible Scanners */}
+            <div style={{ borderBottom: '1px solid var(--border)' }}>
+              <button onClick={() => setScannersExpanded(!scannersExpanded)} style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '0.8rem 0.85rem', background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-secondary)', transition: 'all 0.15s ease'
+              }}>
+                <span style={{ fontSize: '0.6rem', color: 'var(--text-faint)', letterSpacing: '0.1em',
+                  textTransform: 'uppercase', fontWeight: 600 }}>📥 Ingest New Project</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-faint)' }}>{scannersExpanded ? '▲' : '▼'}</span>
+              </button>
+              
+              {scannersExpanded && (
+                <div style={{ padding: '0 0.85rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', animation: 'fadeIn 0.2s ease' }}>
+                  {/* Repo scanner */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: 4 }}>Scan Repository</label>
+                    <input type="text" placeholder="github.com/user/repo" value={repoUrl}
+                      onChange={e => setRepoUrl(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && !scanning && void handleScanRepo()}
+                      disabled={scanning} style={inputStyle} />
+                    <button onClick={() => void handleScanRepo()} disabled={scanning || !repoUrl.trim()}
+                      style={btnStyle(scanning || !repoUrl.trim(), '#4f8ef7')}>
+                      {scanningRepo ? <><Spinner /> Cloning…</> : '🔍 Analyze Repo'}
+                    </button>
+                  </div>
+
+                  {/* Local scanner */}
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '0.8rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.62rem', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: 4 }}>Scan Local Path</label>
+                    <input type="text" placeholder={workspacePath ? `${workspacePath}` : 'C:\\projects\\my-app'}
+                      value={localPath} onChange={e => setLocalPath(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && !scanning && void handleScanLocal()}
+                      disabled={scanning} style={inputStyle} />
+                    {window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && (
+                      <div style={{ fontSize: '0.58rem', color: '#f87171', marginBottom: '0.4rem', lineHeight: 1.3 }}>
+                        ⚠️ Note: Running on remote server. Cannot scan local directories. Run locally to scan local paths.
+                      </div>
+                    )}
+                    <button onClick={() => void handleScanLocal()} disabled={scanning || (!localPath.trim() && !workspacePath)}
+                      style={btnStyle(scanning || (!localPath.trim() && !workspacePath), '#a78bfa')}>
+                      {scanningLocal ? <><Spinner /> Scanning…</> : (localPath.trim() ? '📁 Analyze Local' : '📁 Analyze Workspace')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Status messages */}
+            {(scanSuccess || scanError) && (
+              <div style={{ padding: '0.8rem 0.85rem' }}>
+                {scanSuccess && (
+                  <div style={{ padding: '0.55rem 0.75rem', borderRadius: 8,
+                    background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)',
+                    color: '#34d399', fontSize: '0.73rem', lineHeight: 1.45, animation: 'slideIn 0.2s ease' }}>
+                    ✅ {scanSuccess}
+                  </div>
+                )}
+                {scanError && (
+                  <div style={{ padding: '0.55rem 0.75rem', borderRadius: 8,
+                    background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)',
+                    color: '#f87171', fontSize: '0.73rem', lineHeight: 1.45 }}>
+                    ⚠ {scanError}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ padding: sidebarOpen ? '0.5rem 0.85rem' : '0.5rem 0', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'center' }}>
           {sidebarOpen ? (

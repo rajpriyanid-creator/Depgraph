@@ -107,10 +107,12 @@ export function DependencyGraph({ projectName, onNodeClick }: Props) {
           ctrl.autoRotate = false;
           ctrl.autoRotateSpeed = 0;
           ctrl.enableDamping = true;
-          ctrl.dampingFactor = 0.1;
+          ctrl.dampingFactor = 0.15;
           ctrl.rotateSpeed = 1.2;
           ctrl.zoomSpeed = 3.0;
           ctrl.panSpeed = 1.0;
+          ctrl.minDistance = 1;
+          ctrl.maxDistance = 30000;
           // Update label visibility on camera move — uses ref, no state, no lag
           ctrl.addEventListener('change', () => {
             const cam = fg.camera?.();
@@ -130,7 +132,7 @@ export function DependencyGraph({ projectName, onNodeClick }: Props) {
       }
       fg.d3Force?.('charge')?.strength(viewMode === '3d' ? -220 : -180);
       fg.d3Force?.('link')?.distance(viewMode === '3d' ? 65 : 50);
-      fg.d3VelocityDecay?.(0.5);
+      fg.d3VelocityDecay?.(0.7);
       fg.d3ReheatSimulation?.();
     }, 100);
     return () => clearTimeout(t);
@@ -348,6 +350,8 @@ export function DependencyGraph({ projectName, onNodeClick }: Props) {
               nodeVal={nodeSize}
               width={dims.w}
               height={dims.h}
+              cooldownTicks={15}
+              cooldownTime={150}
               onEngineStop={handleEngineStop}
               nodeCanvasObject={(node: GraphNode, ctx, gs) => {
                 const lbl = node.name ?? '', sz = nodeSize(node), col = nodeColor(node);
@@ -393,6 +397,8 @@ export function DependencyGraph({ projectName, onNodeClick }: Props) {
               nodeThreeObjectExtend={false}
               width={dims.w}
               height={dims.h}
+              cooldownTicks={15}
+              cooldownTime={150}
               onEngineStop={handleEngineStop}
               linkColor={(l: GraphLink) => l.type === 'direct' ? '#4f8ef748' : '#1e273880'}
               linkWidth={(l: GraphLink) => l.type === 'direct' ? 1.8 : 0.7}
