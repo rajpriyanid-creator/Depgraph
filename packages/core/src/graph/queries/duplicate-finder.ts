@@ -23,7 +23,7 @@ export async function findDuplicates(_projectName: string): Promise<DuplicateGro
     allVersions: string[];
     versionDetails: Array<{ version: string; bundleSize?: number; requiredBy: string[] }>;
   }>(
-    `MATCH (p:Package)
+    `MATCH (root:Package {isRoot: true, name: $projectName})-[:DEPENDS_ON*0..20]->(p:Package)
      WITH p.name AS name, collect(p) AS versions
      WHERE size(versions) > 1
      RETURN
@@ -35,7 +35,7 @@ export async function findDuplicates(_projectName: string): Promise<DuplicateGro
          requiredBy: [(req)-[:DEPENDS_ON]->(v) | req.name]
        }] AS versionDetails
      ORDER BY size(versions) DESC`,
-    {},
+    { projectName: _projectName },
   );
 
   return rows.map((row) => {

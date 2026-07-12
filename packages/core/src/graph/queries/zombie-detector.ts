@@ -26,8 +26,8 @@ export async function findZombies(
     size?: number;
     lastPublished?: string;
   }>(
-    `MATCH (root:Package {isRoot: true, name: $projectName})-[:DEPENDS_ON {type: 'direct'}]->(p:Package)
-     WHERE p.scope <> 'development'
+    `MATCH (root:Package {isRoot: true, name: $projectName})-[r:DEPENDS_ON {type: 'direct'}]->(p:Package)
+     WHERE r.scope <> 'development'
      RETURN p.name AS name, p.version AS version, p.bundleSizeGzip AS size, p.lastPublished AS lastPublished`,
     { projectName },
   );

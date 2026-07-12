@@ -319,9 +319,8 @@ export async function runServe(options: ServeOptions): Promise<void> {
         // File no longer on disk (e.g. Render ephemeral FS wiped the clone).
         // Reconstruct a synthetic package.json from Neo4j graph data.
         const directDeps = await runReadQuery<{ name: string; version: string; scope: string }>(
-          `MATCH (root:Package {isRoot: true, name: $projectName})-[:DEPENDS_ON]->(p:Package)
-           WHERE p.isDirect = true
-           RETURN DISTINCT p.name AS name, p.version AS version, p.scope AS scope`,
+          `MATCH (root:Package {isRoot: true, name: $projectName})-[r:DEPENDS_ON {type: 'direct'}]->(p:Package)
+           RETURN DISTINCT p.name AS name, p.version AS version, r.scope AS scope`,
           { projectName },
         );
 
@@ -699,8 +698,13 @@ export async function runServe(options: ServeOptions): Promise<void> {
         healthScore?: number; healthLabel?: string;
       }>(
         `MATCH (root:Package {isRoot: true, name: $name})-[:DEPENDS_ON*0..20]->(p:Package)
+         OPTIONAL MATCH (root)-[r:DEPENDS_ON]->(p)
+         WITH root, p, r,
+              EXISTS { (root)-[:DEPENDS_ON {scope: 'production'}]-[:DEPENDS_ON*0..19]->(p) } AS isProd
          RETURN DISTINCT p.id AS id, p.name AS name, p.version AS version,
-           p.scope AS scope, p.isDirect AS isDirect, p.isRoot AS isRoot,
+           (CASE WHEN isProd OR p.name = $name THEN 'production' ELSE 'development' END) AS scope,
+           (CASE WHEN r IS NOT NULL THEN true ELSE false END) AS isDirect,
+           (CASE WHEN p.name = $name THEN true ELSE false END) AS isRoot,
            p.cveSeverity AS cveSeverity, p.healthScore AS healthScore,
            p.healthLabel AS healthLabel
          LIMIT 2000`,
