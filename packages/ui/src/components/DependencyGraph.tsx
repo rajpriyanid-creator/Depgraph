@@ -18,6 +18,19 @@ interface Props { projectName: string; onNodeClick: (node: GraphNode) => void; }
 const SEV: Record<string, string> = { critical: '#ff4444', high: '#ff8800', medium: '#eab308', low: '#3b82f6' };
 const HPH: Record<string, string> = { healthy: '#22c55e', watch: '#eab308', caution: '#f97316', risky: '#ef4444' };
 
+// Shared Three.js geometries and material cache to eliminate WebGL instantiation overhead and lag
+const rootGeo = new THREE.OctahedronGeometry(12);
+const directGeo = new THREE.SphereGeometry(6, 8, 8);
+const transitiveGeo = new THREE.SphereGeometry(3.5, 6, 6);
+
+const materialsCache: Record<string, THREE.MeshLambertMaterial> = {};
+function getSharedMaterial(color: string) {
+  if (!materialsCache[color]) {
+    materialsCache[color] = new THREE.MeshLambertMaterial({ color });
+  }
+  return materialsCache[color];
+}
+
 function nodeColor(n: GraphNode) {
   if (n.isRoot) return '#a78bfa';
   if (n.cveSeverity) return SEV[n.cveSeverity] ?? '#888';
@@ -104,8 +117,8 @@ export function DependencyGraph({ projectName, onNodeClick }: Props) {
       if (viewMode === '3d') {
         const ctrl = fg.controls?.();
         if (ctrl) {
-          ctrl.autoRotate = false;
-          ctrl.autoRotateSpeed = 0;
+          ctrl.autoRotate = true;
+          ctrl.autoRotateSpeed = 0.12;
           ctrl.enableDamping = true;
           ctrl.dampingFactor = 0.15;
           ctrl.rotateSpeed = 1.2;
@@ -158,14 +171,13 @@ export function DependencyGraph({ projectName, onNodeClick }: Props) {
     const color = nodeColor(node);
     const size  = nodeSize(node);
 
-    // Sphere geometry
+    // Sphere geometry (reusing shared objects)
     const geo = node.isRoot
-      ? new THREE.OctahedronGeometry(size)
-      : new THREE.SphereGeometry(size, 10, 10);
-    const mesh = new THREE.Mesh(
-      geo,
-      new THREE.MeshLambertMaterial({ color })
-    );
+      ? rootGeo
+      : node.isDirect
+        ? directGeo
+        : transitiveGeo;
+    const mesh = new THREE.Mesh(geo, getSharedMaterial(color));
 
     // Label sprite — positioned above sphere
     if (node.name) {
@@ -322,9 +334,9 @@ export function DependencyGraph({ projectName, onNodeClick }: Props) {
                 {hoveredNode.name}
               </div>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-faint)' }}>v{hoveredNode.version}</div>
-              {hoveredNode.healthScore !== undefined && (
-                <div style={{ fontSize: '0.72rem', marginTop: 5, color: HPH[hoveredNode.healthLabel ?? 'watch'] }}>
-                  Health {hoveredNode.healthScore}/100 · {hoveredNode.healthLabel}
+              {hoveredNode.healthScore !== undefined && hoveredNode.healthScore !== null && (
+                <div style={{ fontSize: '0.72rem', marginTop: 5, color: HPH[hoveredNode.healthLabel ?? 'watch'] ?? 'var(--text-muted)' }}>
+                  Health {hoveredNode.healthScore}/100 · {hoveredNode.healthLabel ?? 'unknown'}
                 </div>
               )}
               {hoveredNode.cveSeverity && (
@@ -350,8 +362,8 @@ export function DependencyGraph({ projectName, onNodeClick }: Props) {
               nodeVal={nodeSize}
               width={dims.w}
               height={dims.h}
-              cooldownTicks={15}
-              cooldownTime={150}
+              cooldownTicks={80}
+              cooldownTime={1200}
               onEngineStop={handleEngineStop}
               nodeCanvasObject={(node: GraphNode, ctx, gs) => {
                 const lbl = node.name ?? '', sz = nodeSize(node), col = nodeColor(node);
@@ -397,8 +409,8 @@ export function DependencyGraph({ projectName, onNodeClick }: Props) {
               nodeThreeObjectExtend={false}
               width={dims.w}
               height={dims.h}
-              cooldownTicks={15}
-              cooldownTime={150}
+              cooldownTicks={80}
+              cooldownTime={1200}
               onEngineStop={handleEngineStop}
               linkColor={(l: GraphLink) => l.type === 'direct' ? '#4f8ef748' : '#1e273880'}
               linkWidth={(l: GraphLink) => l.type === 'direct' ? 1.8 : 0.7}

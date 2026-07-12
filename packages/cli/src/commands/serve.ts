@@ -695,12 +695,14 @@ export async function runServe(options: ServeOptions): Promise<void> {
     try {
       const nodeRows = await runReadQuery<{
         id: string; name: string; version: string; scope: string;
-        isDirect: boolean; cveSeverity?: string; healthScore?: number;
+        isDirect: boolean; isRoot?: boolean; cveSeverity?: string;
+        healthScore?: number; healthLabel?: string;
       }>(
         `MATCH (root:Package {isRoot: true, name: $name})-[:DEPENDS_ON*0..20]->(p:Package)
          RETURN DISTINCT p.id AS id, p.name AS name, p.version AS version,
-           p.scope AS scope, p.isDirect AS isDirect,
-           p.cveSeverity AS cveSeverity, p.healthScore AS healthScore
+           p.scope AS scope, p.isDirect AS isDirect, p.isRoot AS isRoot,
+           p.cveSeverity AS cveSeverity, p.healthScore AS healthScore,
+           p.healthLabel AS healthLabel
          LIMIT 2000`,
         { name: req.params['projectName'] },
       );
