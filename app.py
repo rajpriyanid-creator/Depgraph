@@ -23,8 +23,8 @@ def add(a: float, b: float) -> float:
 
 
 def divide(a: float, b: float) -> float:
-    # BUG: no guard against b == 0 -> raises ZeroDivisionError instead of
-    # returning a sane fallback value. Warden's patch action fixes this.
+    if b == 0:
+        return 0.0
     return a / b
 
 
